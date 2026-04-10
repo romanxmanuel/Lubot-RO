@@ -13,6 +13,11 @@ RULES:
 - Skin templates used by CharacterSkinService should live in ReplicatedStorage.GameParts.PlayerCharacters.
 - Runtime systems clone ToolTemplate into player backpacks.
 - Do not rewrite or rebuild imported scripts unless Roman explicitly asks.
+
+CURRENT SKIN IMPORT FOLDERS:
+- Skins/GojoWhite_91131914057854
+- Skins/Luffy_135518784693410
+- Skins/LuffyGear5_10039008438
 ]]
 
 return {}

@@ -135,6 +135,22 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 amount = 1,
             })
         end
+
+        local luffySkinEntry = getInventoryEntry(profile, 'luffy_skin')
+        if not luffySkinEntry then
+            table.insert(profile.inventory, {
+                itemId = 'luffy_skin',
+                amount = 1,
+            })
+        end
+
+        local luffyGear5SkinEntry = getInventoryEntry(profile, 'luffy_gear_5_skin')
+        if not luffyGear5SkinEntry then
+            table.insert(profile.inventory, {
+                itemId = 'luffy_gear_5_skin',
+                amount = 1,
+            })
+        end
     end)
 end
 
