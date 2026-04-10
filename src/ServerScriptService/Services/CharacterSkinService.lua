@@ -28,6 +28,16 @@ local FACE_COSMETIC_CLASSES = {
     Texture = true,
 }
 
+local EFFECT_NODE_CLASSES = {
+    Attachment = true,
+    ParticleEmitter = true,
+    Trail = true,
+    Beam = true,
+    PointLight = true,
+    SpotLight = true,
+    SurfaceLight = true,
+}
+
 local CORE_CHARACTER_PART_NAMES = {
     Head = true,
     HumanoidRootPart = true,
@@ -60,8 +70,19 @@ local function shouldCopyFaceInstance(instance: Instance): boolean
     return FACE_COSMETIC_CLASSES[instance.ClassName] == true
 end
 
+local function isEffectNodeClass(className: string): boolean
+    return EFFECT_NODE_CLASSES[className] == true
+end
+
 local function isCoreCharacterPartName(name: string): boolean
     return CORE_CHARACTER_PART_NAMES[name] == true
+end
+
+local function markTreeAttribute(root: Instance, attrName: string)
+    root:SetAttribute(attrName, true)
+    for _, descendant in ipairs(root:GetDescendants()) do
+        descendant:SetAttribute(attrName, true)
+    end
 end
 
 local function getPlayerCharactersFolder(): Folder?
@@ -212,6 +233,20 @@ local function clearSkinAddonParts(character: Model)
     end
 end
 
+local function clearSkinEffectNodes(character: Model)
+    local toDestroy = {}
+    for _, descendant in ipairs(character:GetDescendants()) do
+        if descendant:GetAttribute('SkinEffectNode') == true then
+            table.insert(toDestroy, descendant)
+        end
+    end
+    for _, instance in ipairs(toDestroy) do
+        if instance.Parent then
+            instance:Destroy()
+        end
+    end
+end
+
 local function templatePartWeldedToHead(templatePart: BasePart, templateHead: BasePart): boolean
     for _, child in ipairs(templatePart:GetChildren()) do
         if child:IsA('Weld') then
@@ -259,6 +294,8 @@ local function applyTemplateHeadAddons(character: Model, template: Model)
             local clonePart = descendant:Clone()
             stripPartJoints(clonePart)
             clonePart.Name = descendant.Name
+            local relative = templateHead.CFrame:ToObjectSpace(descendant.CFrame)
+            clonePart.CFrame = characterHead.CFrame * relative
             clonePart.Anchored = false
             clonePart.CanCollide = false
             clonePart.Massless = true
@@ -269,6 +306,46 @@ local function applyTemplateHeadAddons(character: Model, template: Model)
             weldConstraint.Part0 = clonePart
             weldConstraint.Part1 = characterHead
             weldConstraint.Parent = clonePart
+        end
+    end
+end
+
+local function attachmentContainsEffects(attachment: Attachment): boolean
+    for _, descendant in ipairs(attachment:GetDescendants()) do
+        if descendant ~= attachment and isEffectNodeClass(descendant.ClassName) and not descendant:IsA('Attachment') then
+            return true
+        end
+    end
+    return false
+end
+
+local function shouldCopyPartEffectNode(instance: Instance): boolean
+    if instance:IsA('Attachment') then
+        return attachmentContainsEffects(instance)
+    end
+
+    return isEffectNodeClass(instance.ClassName) and not instance:IsA('Attachment')
+end
+
+local function applyTemplatePartEffects(character: Model, template: Model)
+    clearSkinEffectNodes(character)
+
+    for _, templatePart in ipairs(template:GetDescendants()) do
+        if not templatePart:IsA('BasePart') then
+            continue
+        end
+
+        local targetPart = character:FindFirstChild(templatePart.Name)
+        if not (targetPart and targetPart:IsA('BasePart')) then
+            continue
+        end
+
+        for _, child in ipairs(templatePart:GetChildren()) do
+            if shouldCopyPartEffectNode(child) then
+                local clone = child:Clone()
+                markTreeAttribute(clone, 'SkinEffectNode')
+                clone.Parent = targetPart
+            end
         end
     end
 end
@@ -326,6 +403,7 @@ local function applyTemplateToCharacter(character: Model, template: Model)
 
     applyTemplateFace(character, template)
     applyTemplateHeadAddons(character, template)
+    applyTemplatePartEffects(character, template)
 end
 
 local function applySkinToCharacter(player: Player, templateId: string)
