@@ -12,6 +12,12 @@ These are now mandatory for this project:
 3. Keep local files, Rojo sync, Studio runtime, and Git history aligned.
 4. Before any Studio file/script edit, always stop play test mode first.
 
+## Workspace split (locked)
+
+- `C:\Users\lily7\Documents\SuperbulletAI\Lubot-RO` is the active implementation repository.
+- `C:\Users\lily7\Claude Code Projects\Ragnarok Online` is docs/planning context.
+- If docs in the context workspace conflict with runtime behavior, this repo + Studio runtime wins.
+
 ## Native Roblox inventory naming
 
 - `Backpack`: Roblox's full tool container.
