@@ -159,6 +159,30 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 amount = 1,
             })
         end
+
+        local sukunaSkinEntry = getInventoryEntry(profile, 'sukuna_skin')
+        if not sukunaSkinEntry then
+            table.insert(profile.inventory, {
+                itemId = 'sukuna_skin',
+                amount = 1,
+            })
+        end
+
+        local dekuOneForAllSkinEntry = getInventoryEntry(profile, 'deku_one_for_all_skin')
+        if not dekuOneForAllSkinEntry then
+            table.insert(profile.inventory, {
+                itemId = 'deku_one_for_all_skin',
+                amount = 1,
+            })
+        end
+
+        local susanooSasukeSkinEntry = getInventoryEntry(profile, 'susanoo_sasuke_skin')
+        if not susanooSasukeSkinEntry then
+            table.insert(profile.inventory, {
+                itemId = 'susanoo_sasuke_skin',
+                amount = 1,
+            })
+        end
     end)
 end
 
