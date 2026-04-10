@@ -46,7 +46,7 @@ local function playMovementSound(parent: Instance, soundId: string, volume: numb
 end
 
 function DefaultMMOCombat:Attack(context)
-    if context:hasUsableEquippedTool() then
+    if context.hasUsableEquippedTool() then
         return false
     end
 
@@ -69,7 +69,7 @@ function DefaultMMOCombat:Block(_context)
 end
 
 function DefaultMMOCombat:Dash(context)
-    if context:toolOwnsActionInput(Enum.KeyCode.Q) then
+    if context.toolOwnsActionInput(Enum.KeyCode.Q) then
         return false
     end
 

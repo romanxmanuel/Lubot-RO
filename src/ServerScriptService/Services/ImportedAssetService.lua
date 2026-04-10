@@ -87,6 +87,45 @@ local function grantImportedItem(player: Player, itemId: string)
     dependencies.Runtime.SystemMessage:FireClient(player, 'Imported item acquired: ' .. itemId)
 end
 
+local function configureImportedLocalScriptActivation(tool: Tool)
+    local localScriptStates: { [LocalScript]: boolean } = {}
+
+    for _, descendant in ipairs(tool:GetDescendants()) do
+        if descendant:IsA('LocalScript') then
+            localScriptStates[descendant] = descendant.Enabled
+            descendant.Enabled = false
+        end
+    end
+
+    if next(localScriptStates) == nil then
+        return
+    end
+
+    local function setEnabled(isEnabled: boolean)
+        for localScript, originalEnabled in pairs(localScriptStates) do
+            if localScript.Parent then
+                localScript.Enabled = isEnabled and originalEnabled
+            end
+        end
+    end
+
+    setEnabled(false)
+
+    tool.Equipped:Connect(function()
+        setEnabled(true)
+    end)
+
+    tool.Unequipped:Connect(function()
+        setEnabled(false)
+    end)
+
+    tool.AncestryChanged:Connect(function()
+        if tool.Parent and tool.Parent:IsA('Backpack') then
+            setEnabled(false)
+        end
+    end)
+end
+
 local function createPickupModel(assetDef, itemDef): Model
     local model = Instance.new('Model')
     model.Name = assetDef.pickupName
@@ -244,6 +283,7 @@ function ImportedAssetService.createToolClone(itemId: string): Tool?
     clone:SetAttribute('ImportedAssetId', template:GetAttribute('ImportedAssetId') or itemId)
     clone:SetAttribute('ImportedToolTemplate', template.Name)
     clone:SetAttribute('ImportedInputPriority', true)
+    configureImportedLocalScriptActivation(clone)
     return clone
 end
 

@@ -106,6 +106,10 @@ local function applyCharacterStats(player: Player, character: Model)
     humanoid.MaxHealth = derivedStats.maxHealth
     humanoid.Health = math.clamp(derivedStats.maxHealth * previousHealthRatio, 1, derivedStats.maxHealth)
     humanoid.WalkSpeed = derivedStats.walkSpeed
+    if type(GameConfig.BaseJumpPower) == 'number' and GameConfig.BaseJumpPower > 0 then
+        humanoid.UseJumpPower = true
+        humanoid.JumpPower = GameConfig.BaseJumpPower
+    end
 
     player:SetAttribute('HP', humanoid.Health)
     player:SetAttribute('MaxHP', humanoid.MaxHealth)
