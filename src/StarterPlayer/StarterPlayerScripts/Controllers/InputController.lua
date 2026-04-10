@@ -175,7 +175,7 @@ local function toolOwnsActionInput(keyCode: Enum.KeyCode): boolean
         return false
     end
 
-    if keyCode == Enum.KeyCode.Q or keyCode == Enum.KeyCode.E then
+    if keyCode == Enum.KeyCode.Q or keyCode == Enum.KeyCode.E or keyCode == Enum.KeyCode.R then
         return true
     end
 

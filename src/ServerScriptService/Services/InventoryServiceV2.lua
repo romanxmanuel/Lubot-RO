@@ -104,7 +104,6 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 amount = 1,
             })
         end
-
     end)
 end
 
@@ -147,6 +146,11 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
                     dependencies.CharacterSkinService.applySkin(player, itemDef.skinTemplateId)
                 end)
                 skinTool.Parent = backpack
+            elseif itemDef.toolKind == 'imported_tool' then
+                local importedTool = dependencies.ImportedAssetService.createToolClone(entry.itemId)
+                if importedTool then
+                    importedTool.Parent = backpack
+                end
             else
                 local itemTool = ToolFactory.createInventoryItemTool(entry.itemId, itemDef, entry.amount)
                 itemTool.Parent = backpack

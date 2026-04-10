@@ -36,6 +36,17 @@ return {
         handleColor = Color3.fromRGB(72, 132, 86),
         accentColor = Color3.fromRGB(214, 255, 223),
     },
+    imported_chaos_edge = {
+        id = 'imported_chaos_edge',
+        displayName = 'Chaos Edge',
+        description = 'Raw imported marketplace sword with its original scripts and keybinds intact.',
+        toolKind = 'imported_tool',
+        rarity = 'epic',
+        stackable = false,
+        importedAssetId = 10288487412,
+        handleColor = Color3.fromRGB(132, 68, 48),
+        accentColor = Color3.fromRGB(255, 145, 84),
+    },
     minor_healing_potion = {
         id = 'minor_healing_potion',
         displayName = 'Minor Healing Potion',
