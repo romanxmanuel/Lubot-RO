@@ -121,6 +121,12 @@ cd "C:\Users\lily7\Documents\SuperbulletAI\Lubot-RO"
 rojo serve default.project.json --port 34872
 ```
 
+Expected SuperbulletAI panel ports:
+
+- Rojo Port: `34872`
+- Server Port: `13528`
+- Rojo status should show connected before feature implementation.
+
 Start Roblox Studio MCP bridge:
 
 ```powershell
