@@ -18,6 +18,21 @@ local ensureTracks: (character: Model) -> ()
 
 local animationSets = {
     Default = {
+        folderPath = { 'AnimationSources', 'CombatAnimations', 'AnimSaves' },
+        jump = 'DetroitAnim',
+        combo = { 'Hit 1', 'Hit 2', 'Hit 3', 'Hit 4', 'Hit 5' },
+        dash = {
+            forward = 'Manchester Smash',
+            back = 'Manchester Smash',
+            left = 'Manchester Smash',
+            right = 'Manchester Smash',
+        },
+        m2 = 'M2',
+        block = 'Block',
+        combatIdle = 'Combat - Idle',
+        combatWalk = 'Combat - Walk',
+    },
+    DekuLegacy = {
         folderPath = { 'PlayerCharacters', 'DekuAnimations' },
         jump = 'DetroitAnim',
         combo = { 'DetroitAnim', 'Manchester Smash', 'ST.LuisSmash', '100%DetroitSmash' },
@@ -28,26 +43,11 @@ local animationSets = {
             right = 'Manchester Smash',
         },
     },
-    HighQualityR6Combat = {
-        folderPath = { 'AnimationSources', 'HighQualityR6CombatAnimations', 'AnimSaves' },
-        jump = 'Landed',
-        combo = { 'Combat1', 'Combat2', 'Combat3', 'Combat4', 'Combat5' },
-        dash = {
-            forward = 'Dash W',
-            back = 'Dash S',
-            left = 'Dash A',
-            right = 'Dash D',
-        },
-        block = 'Block',
-        parry = 'Parryed',
-        blockbroken = 'Blockbroken',
-        reactions = { 'HitReaction1', 'HitReaction2', 'HitReaction3', 'HitReaction4', 'HitReaction5' },
-    },
 }
 local activeStyleName = 'Default'
 local activeConfig = animationSets.Default
 
-local function getAnimationFolderForStyle(styleName: string): Folder?
+local function getAnimationFolderForStyle(styleName: string): Instance?
     local gameParts = ReplicatedStorage:FindFirstChild('GameParts')
     if not gameParts then
         return nil
@@ -61,13 +61,13 @@ local function getAnimationFolderForStyle(styleName: string): Folder?
     local current: Instance = gameParts
     for _, segment in ipairs(config.folderPath) do
         local nextNode = current:FindFirstChild(segment)
-        if not nextNode or not nextNode:IsA('Folder') then
+        if not nextNode then
             return nil
         end
         current = nextNode
     end
 
-    return current :: Folder
+    return current
 end
 
 local function getSequence(sequenceName: string): KeyframeSequence?
@@ -267,6 +267,10 @@ function CharacterAnimationController.playBasicAttack(): string?
     local track, sequenceName = getNextComboTrack()
     playTrack(track)
     return sequenceName
+end
+
+function CharacterAnimationController.getActiveStyleName(): string
+    return activeStyleName
 end
 
 return CharacterAnimationController

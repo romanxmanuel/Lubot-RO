@@ -256,6 +256,7 @@ local function tryBasicAttack()
     dependencies.Runtime.ActionRequest:FireServer({
         action = MMONet.Actions.BasicAttack,
         comboName = comboName,
+        styleName = dependencies.CharacterAnimationController and dependencies.CharacterAnimationController.getActiveStyleName() or 'Default',
     })
 end
 

@@ -82,10 +82,17 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
             })
         end
 
-        local styleEntry = getInventoryEntry(profile, 'r6_combat_emblem')
+        for index = #profile.inventory, 1, -1 do
+            local itemId = profile.inventory[index].itemId
+            if itemId == 'r6_combat_emblem' or itemId == 'gojo_skin' then
+                table.remove(profile.inventory, index)
+            end
+        end
+
+        local styleEntry = getInventoryEntry(profile, 'deku_combat_emblem')
         if not styleEntry then
             table.insert(profile.inventory, {
-                itemId = 'r6_combat_emblem',
+                itemId = 'deku_combat_emblem',
                 amount = 1,
             })
         end
@@ -98,13 +105,6 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
             })
         end
 
-        local gojoSkinEntry = getInventoryEntry(profile, 'gojo_skin')
-        if not gojoSkinEntry then
-            table.insert(profile.inventory, {
-                itemId = 'gojo_skin',
-                amount = 1,
-            })
-        end
     end)
 end
 

@@ -55,12 +55,15 @@ function CombatServiceV2.performBasicAttack(player: Player, payload)
     end
 
     dependencies.CharacterService.markAttackUsed(player)
-    dependencies.Runtime.EffectEvent:FireAllClients(MMONet.Effects.DekuSmash, {
-        userId = player.UserId,
-        origin = origin,
-        direction = lookVector,
-        comboName = type(payload) == 'table' and payload.comboName or nil,
-    })
+    local styleName = type(payload) == 'table' and payload.styleName or 'Default'
+    if styleName == 'DekuLegacy' then
+        dependencies.Runtime.EffectEvent:FireAllClients(MMONet.Effects.DekuSmash, {
+            userId = player.UserId,
+            origin = origin,
+            direction = lookVector,
+            comboName = type(payload) == 'table' and payload.comboName or nil,
+        })
+    end
     dependencies.Runtime.EffectEvent:FireAllClients(MMONet.Effects.Slash, {
         userId = player.UserId,
         origin = origin,

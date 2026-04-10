@@ -67,6 +67,10 @@ local function normalizeProfile(rawProfile)
         end
     end
 
+    if profile.skinTemplateId == 'GojoCharacterTemplate' then
+        profile.skinTemplateId = 'DekuCharacterTemplate'
+    end
+
     profile.jobLevel = nil
     profile.jobExperience = nil
 

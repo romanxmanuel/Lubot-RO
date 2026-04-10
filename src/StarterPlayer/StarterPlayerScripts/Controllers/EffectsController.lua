@@ -16,10 +16,10 @@ local DASH_TEXTURE = 'rbxassetid://7216979807'
 local ATTACK_SOUND_ID = 'rbxassetid://134072730260352'
 
 local function getSkinBurstPalette(templateId: string?): (Color3, Color3)
-    if templateId == 'GojoCharacterTemplate' then
-        return Color3.fromRGB(109, 195, 255), Color3.fromRGB(238, 247, 255)
+    if templateId == 'DekuCharacterTemplate' then
+        return Color3.fromRGB(78, 255, 176), Color3.fromRGB(211, 255, 243)
     end
-    return Color3.fromRGB(78, 255, 176), Color3.fromRGB(211, 255, 243)
+    return Color3.fromRGB(180, 228, 255), Color3.fromRGB(244, 250, 255)
 end
 
 local function getDekuFxFolder(): Folder?
