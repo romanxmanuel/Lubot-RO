@@ -14,14 +14,14 @@
    - startup command: `cmd.exe /c %LOCALAPPDATA%\Roblox\mcp.bat`
 2. Verify Rojo is serving this project on port `34872`:
    - `rojo serve default.project.json --port 34872`
-3. Verify SuperbulletAI panel baseline:
+3. Verify active Studio instance is correct before changes.
+4. Check play state and stop play mode before any Studio script/file edit.
+5. Check git status before edits.
+6. Verify SuperbulletAI panel baseline:
    - Rojo status should be connected
    - Rojo Port: `34872`
    - Server Port: `13528`
-4. If either Rojo or MCP is disconnected, reconnect them before implementation work.
-5. Verify active Studio instance is correct before changes.
-6. Check play state and stop play mode before any Studio script/file edit.
-7. Check git status before edits.
+7. If either Rojo or MCP is disconnected, reconnect them before implementation work.
 
 ## Workflow (mandatory for each feature prompt)
 
