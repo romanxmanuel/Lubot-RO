@@ -2,6 +2,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -274,7 +275,11 @@ local function getNativeBackpackFrames()
 end
 
 local function toggleNativeInventoryWindow()
-	local inventoryFrame = getNativeBackpackFrames()
+	pcall(function()
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+	end)
+
+	local inventoryFrame, hotbarFrame = getNativeBackpackFrames()
 	if not inventoryFrame then
 		warn("[HUDController] Native backpack inventory frame not found; cannot toggle window.")
 		return
@@ -284,14 +289,21 @@ local function toggleNativeInventoryWindow()
 
 	task.spawn(function()
 		for _ = 1, 20 do
-			local currentInventoryFrame = getNativeBackpackFrames()
+			local currentInventoryFrame, currentHotbarFrame = getNativeBackpackFrames()
 			if not currentInventoryFrame then
 				break
 			end
 			currentInventoryFrame.Visible = desiredInventoryVisible == true
+			if currentHotbarFrame then
+				currentHotbarFrame.Visible = true
+			end
 			task.wait()
 		end
 	end)
+
+	if hotbarFrame then
+		hotbarFrame.Visible = true
+	end
 end
 
 local function refreshStatsSection()
@@ -628,6 +640,10 @@ local function ensureGui()
 		dependencies.Runtime.ActionRequest:FireServer({
 			action = MMONet.Actions.StashInventoryTools,
 		})
+		local inventoryFrame = getNativeBackpackFrames()
+		if inventoryFrame and not inventoryFrame.Visible then
+			toggleNativeInventoryWindow()
+		end
 	end)
 
 	refs.utilityFrame = utilityFrame
@@ -682,9 +698,12 @@ local function updateSummary()
 	refs.jexpFill.Size = UDim2.fromScale(1, 1)
 	refs.jexpLabel.Text = string.format("LV %d", level)
 
-	local inventoryFrame = getNativeBackpackFrames()
+	local inventoryFrame, hotbarFrame = getNativeBackpackFrames()
 	if inventoryFrame and desiredInventoryVisible ~= nil and inventoryFrame.Visible ~= desiredInventoryVisible then
 		inventoryFrame.Visible = desiredInventoryVisible
+	end
+	if hotbarFrame then
+		hotbarFrame.Visible = true
 	end
 
 	if refs.inventoryToggleButton then
@@ -695,8 +714,7 @@ local function updateSummary()
 		end
 	end
 
-	local toolsStashed = localPlayer:GetAttribute("InventoryToolsStashed") == true
-	refs.stashButton.Text = toolsStashed and "Stored" or "Store"
+	refs.stashButton.Text = "Store"
 
 	refreshStatsSection()
 end

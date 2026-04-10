@@ -88,6 +88,7 @@ end
 function InventoryServiceV2.ensureStarterLoadout(player: Player)
     dependencies.PersistenceService.updateProfile(player, function(profile)
         profile.equippedWeaponId = ''
+        profile.inventoryToolsStashed = false
 
         if #profile.unlockedSkills == 0 then
             table.insert(profile.unlockedSkills, 'power_slash')
@@ -145,8 +146,6 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
         destroyTools(player.Character)
     end
 
-    local inventoryToolsStashed = profile.inventoryToolsStashed == true
-
     for _, skillId in ipairs(profile.skillLoadout) do
         local skillDef = SkillData[skillId]
         if skillDef then
@@ -161,9 +160,6 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
         local itemDef = ItemData[entry.itemId]
         if itemDef and entry.amount > 0 then
             if not shouldMaterializeInventoryTool(itemDef) then
-                continue
-            end
-            if inventoryToolsStashed then
                 continue
             end
             if itemDef.toolKind == 'consumable' then
@@ -235,33 +231,26 @@ function InventoryServiceV2.addItem(player: Player, itemId: string, amount: numb
 end
 
 function InventoryServiceV2.toggleInventoryToolStash(player: Player)
-    local nowStashed = false
-
-    dependencies.PersistenceService.updateProfile(player, function(profile)
-        profile.inventoryToolsStashed = not (profile.inventoryToolsStashed == true)
-        nowStashed = profile.inventoryToolsStashed == true
-    end)
-
-    InventoryServiceV2.rebuildPlayerTools(player)
-    dependencies.Runtime.SystemMessage:FireClient(
-        player,
-        nowStashed and 'Usable tools hidden from the hotbar.' or 'Usable tools restored to the hotbar.'
-    )
+    InventoryServiceV2.stashInventoryTools(player)
 end
 
 function InventoryServiceV2.stashInventoryTools(player: Player)
-    local nowStashed = false
     local changed = false
 
     dependencies.PersistenceService.updateProfile(player, function(profile)
         if profile.inventoryToolsStashed == true then
-            nowStashed = true
-            return
+            profile.inventoryToolsStashed = false
+            changed = true
         end
-        profile.inventoryToolsStashed = true
-        nowStashed = true
-        changed = true
     end)
+
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass('Humanoid')
+        if humanoid then
+            humanoid:UnequipTools()
+        end
+    end
 
     if changed then
         InventoryServiceV2.rebuildPlayerTools(player)
@@ -269,7 +258,7 @@ function InventoryServiceV2.stashInventoryTools(player: Player)
 
     dependencies.Runtime.SystemMessage:FireClient(
         player,
-        nowStashed and 'Moved current usable tools from hotbar into inventory.' or 'Hotbar tools are active.'
+        'Moved equipped tools into your bag.'
     )
 end
 
