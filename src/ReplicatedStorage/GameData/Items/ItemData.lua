@@ -48,18 +48,6 @@ return {
         handleColor = Color3.fromRGB(211, 219, 233),
         accentColor = Color3.fromRGB(244, 249, 255),
     },
-    luffy_skin = {
-        id = 'luffy_skin',
-        displayName = 'Luffy',
-        description = 'Apply the Luffy look to your current character.',
-        toolKind = 'skin',
-        rarity = 'epic',
-        stackable = false,
-        skinTemplateId = 'LuffyCharacterTemplate',
-        skinAssetId = 135518784693410,
-        handleColor = Color3.fromRGB(227, 88, 78),
-        accentColor = Color3.fromRGB(255, 214, 123),
-    },
     luffy_gear_5_skin = {
         id = 'luffy_gear_5_skin',
         displayName = 'Luffy Gear 5',

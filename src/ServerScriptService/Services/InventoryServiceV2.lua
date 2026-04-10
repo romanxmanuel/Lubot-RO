@@ -107,7 +107,7 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
 
         for index = #profile.inventory, 1, -1 do
             local itemId = profile.inventory[index].itemId
-            if itemId == 'r6_combat_emblem' or itemId == 'gojo_skin' then
+            if itemId == 'r6_combat_emblem' or itemId == 'gojo_skin' or itemId == 'luffy_skin' then
                 table.remove(profile.inventory, index)
             end
         end
@@ -132,14 +132,6 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
         if not gojoWhiteSkinEntry then
             table.insert(profile.inventory, {
                 itemId = 'gojo_white_skin',
-                amount = 1,
-            })
-        end
-
-        local luffySkinEntry = getInventoryEntry(profile, 'luffy_skin')
-        if not luffySkinEntry then
-            table.insert(profile.inventory, {
-                itemId = 'luffy_skin',
                 amount = 1,
             })
         end
