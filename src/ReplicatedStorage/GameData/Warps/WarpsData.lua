@@ -23,8 +23,8 @@ return {
         displayName = 'Zoltraak',
         aliases = { 'zoltraak', 'zol', 'zt', 'town', 'home' },
         spawnCFrame = CFrame.lookAt(
-            Vector3.new(-245.8780, 4.4200, 225.0194),
-            Vector3.new(-304.0001, 4.4200, 226.9353)
+            Vector3.new(-301.8163, 8.7500, 285.0104),
+            Vector3.new(-304.0001, 8.7500, 226.9353)
         ),
     },
     prontera_field = {

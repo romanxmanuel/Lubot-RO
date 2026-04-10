@@ -54,6 +54,7 @@ local function createDefaultProfile()
         statPoints = StatConfig.StartingStatPoints,
         stats = deepCopy(StatConfig.StartingStats),
         skinTemplateId = 'DekuCharacterTemplate',
+        inventoryToolsStashed = false,
     }
 end
 
@@ -123,6 +124,7 @@ local function syncPlayerSummaryAttributes(player: Player, profile)
     player:SetAttribute('ExperienceMax', getBaseExperienceRequirement(profile.level))
     player:SetAttribute('JobExperience', nil)
     player:SetAttribute('JobExperienceMax', nil)
+    player:SetAttribute('InventoryToolsStashed', profile.inventoryToolsStashed == true)
 end
 
 function PersistenceService.init()

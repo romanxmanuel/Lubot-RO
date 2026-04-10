@@ -11,7 +11,6 @@ local BackpackBridgeController = {
 }
 
 local localPlayer = Players.LocalPlayer
-
 local function setCoreGuiEnabled(coreGuiType: Enum.CoreGuiType, enabled: boolean)
     task.spawn(function()
         for _ = 1, 10 do

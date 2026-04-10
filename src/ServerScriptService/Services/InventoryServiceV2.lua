@@ -33,6 +33,15 @@ local function destroyTools(container: Instance?)
     end
 end
 
+local function shouldMaterializeInventoryTool(itemDef): boolean
+    local toolKind = itemDef.toolKind
+    return toolKind == 'consumable'
+        or toolKind == 'skin'
+        or toolKind == 'imported_tool'
+        or toolKind == 'weapon'
+        or toolKind == 'style'
+end
+
 function InventoryServiceV2.init(deps)
     dependencies = deps
 end
@@ -61,6 +70,16 @@ function InventoryServiceV2.start()
         bindPlayer(player)
     end
     Players.PlayerAdded:Connect(bindPlayer)
+
+    dependencies.Runtime.ActionRequest.OnServerEvent:Connect(function(player, payload)
+        if type(payload) ~= 'table' then
+            return
+        end
+
+        if payload.action == 'ToggleInventoryToolStash' then
+            InventoryServiceV2.toggleInventoryToolStash(player)
+        end
+    end)
 end
 
 function InventoryServiceV2.ensureStarterLoadout(player: Player)
@@ -123,6 +142,8 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
         destroyTools(player.Character)
     end
 
+    local inventoryToolsStashed = profile.inventoryToolsStashed == true
+
     for _, skillId in ipairs(profile.skillLoadout) do
         local skillDef = SkillData[skillId]
         if skillDef then
@@ -136,6 +157,12 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
     for _, entry in ipairs(profile.inventory) do
         local itemDef = ItemData[entry.itemId]
         if itemDef and entry.amount > 0 then
+            if not shouldMaterializeInventoryTool(itemDef) then
+                continue
+            end
+            if inventoryToolsStashed then
+                continue
+            end
             if itemDef.toolKind == 'consumable' then
                 local consumableTool = ToolFactory.createConsumableTool(entry.itemId, itemDef, entry.amount, function()
                     InventoryServiceV2.consumeItem(player, entry.itemId, 1)
@@ -202,6 +229,21 @@ function InventoryServiceV2.addItem(player: Player, itemId: string, amount: numb
     end)
 
     InventoryServiceV2.rebuildPlayerTools(player)
+end
+
+function InventoryServiceV2.toggleInventoryToolStash(player: Player)
+    local nowStashed = false
+
+    dependencies.PersistenceService.updateProfile(player, function(profile)
+        profile.inventoryToolsStashed = not (profile.inventoryToolsStashed == true)
+        nowStashed = profile.inventoryToolsStashed == true
+    end)
+
+    InventoryServiceV2.rebuildPlayerTools(player)
+    dependencies.Runtime.SystemMessage:FireClient(
+        player,
+        nowStashed and 'Usable tools hidden from the hotbar.' or 'Usable tools restored to the hotbar.'
+    )
 end
 
 return InventoryServiceV2

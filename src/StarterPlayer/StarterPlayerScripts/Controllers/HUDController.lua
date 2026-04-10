@@ -7,6 +7,7 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local StatConfig = require(ReplicatedStorage.Shared.Config.StatConfig)
+local MMONet = require(ReplicatedStorage.Shared.Net.MMONet)
 
 local HUDController = {
 	Name = "HUDController",
@@ -552,6 +553,26 @@ local function ensureGui()
 	refs.bossFill = bossFill
 	refs.bossValue = bossValue
 
+	local utilityFrame = Instance.new("Frame")
+	utilityFrame.Name = "UtilityButtons"
+	utilityFrame.BackgroundTransparency = 1
+	utilityFrame.Size = UDim2.fromOffset(58, 26)
+	utilityFrame.Position = UDim2.new(0, 306, 0, 12)
+	utilityFrame.ZIndex = 5
+	utilityFrame.Parent = rootGui
+
+    local stashButton = createButton(utilityFrame, "Hide", UDim2.fromOffset(56, 24), UDim2.fromOffset(0, 0))
+	stashButton.Name = "StashButton"
+	stashButton.TextSize = 10
+	stashButton.MouseButton1Click:Connect(function()
+		dependencies.Runtime.ActionRequest:FireServer({
+			action = MMONet.Actions.ToggleInventoryToolStash,
+		})
+	end)
+
+	refs.utilityFrame = utilityFrame
+	refs.stashButton = stashButton
+
 	applyExpansionVisualState()
 end
 
@@ -599,6 +620,9 @@ local function updateSummary()
 
 	refs.jexpFill.Size = UDim2.fromScale(1, 1)
 	refs.jexpLabel.Text = string.format("LV %d", level)
+
+	local toolsStashed = localPlayer:GetAttribute("InventoryToolsStashed") == true
+    refs.stashButton.Text = toolsStashed and "Show" or "Hide"
 
 	refreshStatsSection()
 end
