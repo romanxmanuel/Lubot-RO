@@ -1,17 +1,20 @@
 {
-  "className": "ModuleScript",
-  "properties": {
-    "Attributes": {},
-    "Sandboxed": {
-      "Bool": false
-    },
-    "ScriptGuid": "{522312A2-A2F3-4743-867F-C3F239CB33C1}",
-    "SourceAssetId": {
-      "Int64": -1
-    },
-    "Tags": {
-      "Tags": []
-    }
-  },
-  "ignoreUnknownInstances": true
+    "properties":  {
+                       "Attributes":  {
+
+                                      },
+                       "Sandboxed":  {
+                                         "Bool":  false
+                                     },
+                       "ScriptGuid":  "{522312A2-A2F3-4743-867F-C3F239CB33C1}",
+                       "SourceAssetId":  {
+                                             "Int64":  -1
+                                         },
+                       "Tags":  {
+                                    "Tags":  [
+
+                                             ]
+                                }
+                   },
+    "ignoreUnknownInstances":  true
 }

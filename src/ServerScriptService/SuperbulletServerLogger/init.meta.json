@@ -1,23 +1,26 @@
 {
-  "className": "Script",
-  "properties": {
-    "Attributes": {},
-    "Disabled": {
-      "Bool": false
-    },
-    "RunContext": {
-      "Enum": 0
-    },
-    "Sandboxed": {
-      "Bool": false
-    },
-    "ScriptGuid": "{2E4A80B4-F34F-4644-9ED5-6F26E3CF385D}",
-    "SourceAssetId": {
-      "Int64": -1
-    },
-    "Tags": {
-      "Tags": []
-    }
-  },
-  "ignoreUnknownInstances": true
+    "properties":  {
+                       "Attributes":  {
+
+                                      },
+                       "Disabled":  {
+                                        "Bool":  false
+                                    },
+                       "RunContext":  {
+                                          "Enum":  0
+                                      },
+                       "Sandboxed":  {
+                                         "Bool":  false
+                                     },
+                       "ScriptGuid":  "{2E4A80B4-F34F-4644-9ED5-6F26E3CF385D}",
+                       "SourceAssetId":  {
+                                             "Int64":  -1
+                                         },
+                       "Tags":  {
+                                    "Tags":  [
+
+                                             ]
+                                }
+                   },
+    "ignoreUnknownInstances":  true
 }
