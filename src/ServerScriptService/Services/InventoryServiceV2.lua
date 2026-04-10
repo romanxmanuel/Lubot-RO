@@ -127,6 +127,14 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 amount = 1,
             })
         end
+
+        local gojoWhiteSkinEntry = getInventoryEntry(profile, 'gojo_white_skin')
+        if not gojoWhiteSkinEntry then
+            table.insert(profile.inventory, {
+                itemId = 'gojo_white_skin',
+                amount = 1,
+            })
+        end
     end)
 end
 
@@ -169,7 +177,7 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
                 consumableTool.Parent = backpack
             elseif itemDef.toolKind == 'skin' then
                 local skinTool = ToolFactory.createSkinTool(entry.itemId, itemDef, function()
-                    dependencies.CharacterSkinService.applySkin(player, itemDef.skinTemplateId)
+                    dependencies.CharacterSkinService.applySkin(player, itemDef.skinTemplateId, itemDef.skinAssetId)
                 end)
                 skinTool.Parent = backpack
             elseif itemDef.toolKind == 'imported_tool' then

@@ -36,6 +36,18 @@ return {
         handleColor = Color3.fromRGB(72, 132, 86),
         accentColor = Color3.fromRGB(214, 255, 223),
     },
+    gojo_white_skin = {
+        id = 'gojo_white_skin',
+        displayName = 'Gojo White',
+        description = 'Apply the Gojo White look to your current character.',
+        toolKind = 'skin',
+        rarity = 'epic',
+        stackable = false,
+        skinTemplateId = 'GojoWhiteCharacterTemplate',
+        skinAssetId = 91131914057854,
+        handleColor = Color3.fromRGB(211, 219, 233),
+        accentColor = Color3.fromRGB(244, 249, 255),
+    },
     imported_chaos_edge = {
         id = 'imported_chaos_edge',
         displayName = 'Chaos Edge',
