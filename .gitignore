@@ -1,0 +1,12 @@
+.superbullet/
+
+# Generated/local tooling outputs
+sourcemap.json
+superbulletai_metadata.json
+utilities_superbullet_meta.json
+
+# Common editor/system noise
+.DS_Store
+Thumbs.db
+*.tmp
+*.log

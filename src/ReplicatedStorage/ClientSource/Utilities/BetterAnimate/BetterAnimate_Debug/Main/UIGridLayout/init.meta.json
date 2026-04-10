@@ -1,0 +1,56 @@
+{
+  "className": "UIGridLayout",
+  "properties": {
+    "Attributes": {},
+    "CellPadding": {
+      "UDim2": [
+        [
+          0.0,
+          0
+        ],
+        [
+          0.0,
+          0
+        ]
+      ]
+    },
+    "CellSize": {
+      "UDim2": [
+        [
+          0.3330000042915344,
+          0
+        ],
+        [
+          0.3330000042915344,
+          0
+        ]
+      ]
+    },
+    "FillDirection": {
+      "Enum": 0
+    },
+    "FillDirectionMaxCells": {
+      "Int32": 0
+    },
+    "HorizontalAlignment": {
+      "Enum": 1
+    },
+    "Sandboxed": {
+      "Bool": false
+    },
+    "SortOrder": {
+      "Enum": 2
+    },
+    "SourceAssetId": {
+      "Int64": -1
+    },
+    "StartCorner": "TopLeft",
+    "Tags": {
+      "Tags": []
+    },
+    "VerticalAlignment": {
+      "Enum": 1
+    }
+  },
+  "ignoreUnknownInstances": true
+}

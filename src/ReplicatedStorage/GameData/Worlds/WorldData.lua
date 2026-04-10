@@ -1,0 +1,35 @@
+--!strict
+
+return {
+    startMapId = 'Zoltraak',
+    startWarpId = 'zoltraak',
+    townGateCenter = Vector3.new(-304.0001, 3.92, 226.9353),
+    townGateRadius = 102,
+    townGateStartAngleDegrees = -18,
+    townNpcCenter = Vector3.new(-304.0001, 3.92, 226.9353),
+    townNpcRadius = 62,
+    returnGateDistance = 14,
+    returnGateHeightOffset = 0,
+    townGateSpecs = {
+        { warpId = 'prontera_field', label = 'Prontera', color = Color3.fromRGB(92, 244, 161) },
+        { warpId = 'ant_hell', label = 'AntHell', color = Color3.fromRGB(255, 194, 77) },
+        { warpId = 'ice_moon', label = 'IceMoon', color = Color3.fromRGB(119, 231, 255) },
+        { warpId = 'lubidrium', label = 'Lubidrium', color = Color3.fromRGB(182, 128, 255) },
+        { warpId = 'abyss_sanctuary', label = 'Abyss', color = Color3.fromRGB(64, 128, 255) },
+        { warpId = 'tower_of_ascension', label = 'Tower', color = Color3.fromRGB(255, 154, 92) },
+        { warpId = 'niffheim', label = 'Niffheim', color = Color3.fromRGB(144, 95, 255) },
+        { warpId = 'abandoned_church', label = 'Church', color = Color3.fromRGB(208, 94, 94) },
+        { warpId = 'abandoned_gothic_church', label = 'Gothic', color = Color3.fromRGB(255, 92, 132) },
+        { warpId = 'bloody_church', label = 'Bloody', color = Color3.fromRGB(255, 58, 58) },
+        { warpId = 'church_of_lost_souls', label = 'Lost Souls', color = Color3.fromRGB(216, 216, 255) },
+    },
+    townNpcRing = {
+        { name = 'Warper', prefix = 'Warper', angleDegrees = 0 },
+        { name = 'Healer', prefix = 'Healer', angleDegrees = 55 },
+        { name = 'Blacksmith', prefix = 'Blacksmith', angleDegrees = 110 },
+        { name = 'JobChanger', prefix = 'JobChanger', angleDegrees = 180 },
+        { name = 'Shopkeeper', prefix = 'Shop', angleDegrees = 235 },
+        { name = 'Rebirth', prefix = 'Rebirth', angleDegrees = 305 },
+        { name = 'StoreHook', prefix = 'StoreHook', angleDegrees = 270 },
+    },
+}

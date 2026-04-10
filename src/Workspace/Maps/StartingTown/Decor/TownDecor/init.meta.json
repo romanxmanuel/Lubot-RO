@@ -1,0 +1,59 @@
+{
+  "className": "Model",
+  "properties": {
+    "Attributes": {},
+    "LevelOfDetail": "Automatic",
+    "ModelMeshCFrame": {
+      "CFrame": {
+        "orientation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "ModelMeshSize": {
+      "Vector3": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "ModelStreamingMode": {
+      "Enum": 0
+    },
+    "NeedsPivotMigration": {
+      "Bool": false
+    },
+    "Sandboxed": {
+      "Bool": false
+    },
+    "Scale": {
+      "Float32": 1.0
+    },
+    "SourceAssetId": {
+      "Int64": -1
+    },
+    "Tags": {
+      "Tags": []
+    }
+  },
+  "ignoreUnknownInstances": true
+}

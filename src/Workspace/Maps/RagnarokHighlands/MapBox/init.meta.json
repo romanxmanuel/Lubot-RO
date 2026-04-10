@@ -1,0 +1,309 @@
+{
+  "className": "Part",
+  "properties": {
+    "Anchored": {
+      "Bool": true
+    },
+    "Attributes": {
+      "ZoneId": {
+        "String": "ragnarok_highlands"
+      },
+      "ZoneLabel": {
+        "String": "Ragnarok Highlands"
+      },
+      "ZoneShape": {
+        "String": "Box"
+      },
+      "ZoneAxis": {
+        "String": "X"
+      },
+      "Priority": {
+        "Int64": 0
+      },
+      "TimeOfDay": {
+        "String": "14:00:00"
+      },
+      "ClockTime": {
+        "Float64": 14.0
+      },
+      "GeographicLatitude": {
+        "Float64": 41.7333
+      },
+      "Brightness": {
+        "Float64": 2.0
+      },
+      "Ambient": {
+        "Color3": [
+          0.392156869,
+          0.392156869,
+          0.392156869
+        ]
+      },
+      "OutdoorAmbient": {
+        "Color3": [
+          0.501960814,
+          0.501960814,
+          0.501960814
+        ]
+      },
+      "FogColor": {
+        "Color3": [
+          0.752941191,
+          0.752941191,
+          0.752941191
+        ]
+      },
+      "FogStart": {
+        "Float64": 0.0
+      },
+      "FogEnd": {
+        "Float64": 1000.0
+      },
+      "ShadowSoftness": {
+        "Float64": 0.3
+      },
+      "ExposureCompensation": {
+        "Float64": 0.0
+      },
+      "EnvironmentalDiffuseScale": {
+        "Float64": 1.0
+      },
+      "EnvironmentalSpecularScale": {
+        "Float64": 1.0
+      },
+      "PrioritizeLightingQuality": {
+        "Bool": true
+      },
+      "LightingStyle": {
+        "String": "Soft"
+      },
+      "ColorShiftTop": {
+        "Color3": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "ColorShiftBottom": {
+        "Color3": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "MusicVolume": {
+        "Float64": 0.4
+      }
+    },
+    "AudioCanCollide": {
+      "Bool": true
+    },
+    "BackParamA": {
+      "Float32": -0.5
+    },
+    "BackParamB": {
+      "Float32": 0.5
+    },
+    "BackSurface": {
+      "Enum": 0
+    },
+    "BackSurfaceInput": {
+      "Enum": 0
+    },
+    "BottomParamA": {
+      "Float32": -0.5
+    },
+    "BottomParamB": {
+      "Float32": 0.5
+    },
+    "BottomSurface": {
+      "Enum": 4
+    },
+    "BottomSurfaceInput": {
+      "Enum": 0
+    },
+    "CFrame": {
+      "CFrame": {
+        "orientation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "position": [
+          2000.0,
+          50.0,
+          -2000.0
+        ]
+      }
+    },
+    "CanCollide": {
+      "Bool": false
+    },
+    "CanQuery": {
+      "Bool": false
+    },
+    "CanTouch": {
+      "Bool": false
+    },
+    "CastShadow": {
+      "Bool": true
+    },
+    "CollisionGroup": "Default",
+    "CollisionGroupId": {
+      "Int32": 0
+    },
+    "Color": {
+      "Color3uint8": [
+        163,
+        162,
+        165
+      ]
+    },
+    "CustomPhysicalProperties": {
+      "PhysicalProperties": "Default"
+    },
+    "EnableFluidForces": {
+      "Bool": true
+    },
+    "FormFactor": {
+      "Enum": 1
+    },
+    "FrontParamA": {
+      "Float32": -0.5
+    },
+    "FrontParamB": {
+      "Float32": 0.5
+    },
+    "FrontSurface": {
+      "Enum": 0
+    },
+    "FrontSurfaceInput": {
+      "Enum": 0
+    },
+    "LeftParamA": {
+      "Float32": -0.5
+    },
+    "LeftParamB": {
+      "Float32": 0.5
+    },
+    "LeftSurface": {
+      "Enum": 0
+    },
+    "LeftSurfaceInput": {
+      "Enum": 0
+    },
+    "Locked": {
+      "Bool": false
+    },
+    "Massless": {
+      "Bool": false
+    },
+    "Material": {
+      "Enum": 1584
+    },
+    "MaterialVariant": "",
+    "PivotOffset": {
+      "CFrame": {
+        "orientation": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "Reflectance": {
+      "Float32": 0.0
+    },
+    "RightParamA": {
+      "Float32": -0.5
+    },
+    "RightParamB": {
+      "Float32": 0.5
+    },
+    "RightSurface": {
+      "Enum": 0
+    },
+    "RightSurfaceInput": {
+      "Enum": 0
+    },
+    "RootPriority": {
+      "Int32": 0
+    },
+    "RotVelocity": {
+      "Vector3": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "Sandboxed": {
+      "Bool": false
+    },
+    "Shape": "Block",
+    "Size": {
+      "Vector3": [
+        800.0,
+        100.0,
+        800.0
+      ]
+    },
+    "SourceAssetId": {
+      "Int64": -1
+    },
+    "Tags": {
+      "Tags": []
+    },
+    "TopParamA": {
+      "Float32": -0.5
+    },
+    "TopParamB": {
+      "Float32": 0.5
+    },
+    "TopSurface": {
+      "Enum": 3
+    },
+    "TopSurfaceInput": {
+      "Enum": 0
+    },
+    "Transparency": {
+      "Float32": 1.0
+    },
+    "Velocity": {
+      "Vector3": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "ignoreUnknownInstances": true
+}

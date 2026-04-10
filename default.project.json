@@ -1,0 +1,35 @@
+{
+  "name": "Lubot-RO",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true,
+      "$path": "src/ReplicatedStorage"
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$ignoreUnknownInstances": true,
+      "$path": "src/ServerScriptService"
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$ignoreUnknownInstances": true,
+      "$path": "src/StarterPlayer"
+    },
+    "ServerStorage": {
+      "$path": "src/ServerStorage",
+      "$ignoreUnknownInstances": true,
+      "$className": "ServerStorage"
+    },
+    "SoundService": {
+      "$path": "src/SoundService",
+      "$ignoreUnknownInstances": true
+    },
+    "Workspace": {
+      "$path": "src/Workspace",
+      "$ignoreUnknownInstances": true,
+      "$className": "Workspace"
+    }
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "className": "TextLabel",
+  "properties": {
+    "Active": {
+      "Bool": false
+    },
+    "AnchorPoint": {
+      "Vector2": [
+        0.0,
+        0.0
+      ]
+    },
+    "Attributes": {},
+    "AutoLocalize": {
+      "Bool": true
+    },
+    "AutomaticSize": {
+      "Enum": 0
+    },
+    "BackgroundColor3": {
+      "Color3": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "BackgroundTransparency": {
+      "Float32": 1.0
+    },
+    "BorderColor3": {
+      "Color3": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "BorderMode": {
+      "Enum": 0
+    },
+    "BorderSizePixel": {
+      "Int32": 0
+    },
+    "ClipsDescendants": {
+      "Bool": false
+    },
+    "Draggable": {
+      "Bool": false
+    },
+    "FontFace": {
+      "Font": {
+        "family": "rbxasset://fonts/families/Zekton.json",
+        "style": "Normal",
+        "weight": "Regular"
+      }
+    },
+    "InputSink": {
+      "Enum": 0
+    },
+    "Interactable": {
+      "Bool": true
+    },
+    "LayoutOrder": {
+      "Int32": 0
+    },
+    "LineHeight": {
+      "Float32": 1.0
+    },
+    "LocalizationMatchIdentifier": "",
+    "LocalizationMatchedSourceText": "",
+    "MaxVisibleGraphemes": {
+      "Int32": -1
+    },
+    "OpenTypeFeatures": "",
+    "Position": {
+      "UDim2": [
+        [
+          0.0,
+          0
+        ],
+        [
+          0.0,
+          0
+        ]
+      ]
+    },
+    "RichText": {
+      "Bool": false
+    },
+    "Rotation": {
+      "Float32": 0.0
+    },
+    "Sandboxed": {
+      "Bool": false
+    },
+    "Selectable": {
+      "Bool": false
+    },
+    "SelectionBehaviorDown": {
+      "Enum": 0
+    },
+    "SelectionBehaviorLeft": {
+      "Enum": 0
+    },
+    "SelectionBehaviorRight": {
+      "Enum": 0
+    },
+    "SelectionBehaviorUp": {
+      "Enum": 0
+    },
+    "SelectionGroup": {
+      "Bool": false
+    },
+    "SelectionOrder": {
+      "Int32": 0
+    },
+    "Size": {
+      "UDim2": [
+        [
+          0.30000001192092896,
+          0
+        ],
+        [
+          0.30000001192092896,
+          0
+        ]
+      ]
+    },
+    "SizeConstraint": {
+      "Enum": 0
+    },
+    "SourceAssetId": {
+      "Int64": -1
+    },
+    "Tags": {
+      "Tags": []
+    },
+    "Text": "Class: Idle",
+    "TextColor3": {
+      "Color3": [
+        0.9843137860298157,
+        1.0,
+        0.0
+      ]
+    },
+    "TextDirection": {
+      "Enum": 0
+    },
+    "TextScaled": {
+      "Bool": true
+    },
+    "TextSize": {
+      "Float32": 14.0
+    },
+    "TextStrokeColor3": {
+      "Color3": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "TextStrokeTransparency": {
+      "Float32": 1.0
+    },
+    "TextTransparency": {
+      "Float32": 0.0
+    },
+    "TextTruncate": "None",
+    "TextWrapped": {
+      "Bool": true
+    },
+    "TextXAlignment": "Center",
+    "TextYAlignment": "Center",
+    "Visible": {
+      "Bool": true
+    },
+    "ZIndex": {
+      "Int32": 1
+    }
+  },
+  "ignoreUnknownInstances": true
+}

@@ -1,0 +1,120 @@
+--!strict
+
+local StatBalanceConfig = {
+    BaseStats = {
+        MaxBaseStat = 255,
+        Starting = {
+            STR = 5,
+            AGI = 5,
+            VIT = 5,
+            INT = 5,
+            DEX = 5,
+            LUK = 5,
+        },
+    },
+    Core = {
+        BaseHealth = 100,
+        BaseMana = 50,
+        BasePhysicalAttack = 0,
+        BaseMagicAttack = 0,
+        BasePhysicalDefense = 0,
+        BaseMagicDefense = 0,
+        BaseHit = 0,
+        BaseFlee = 0,
+        BaseCritChance = 0,
+        BaseCritDamage = 1.5,
+        BaseCastSeconds = 1.0,
+        MinCastMultiplier = 0.1,
+        BaseCarryWeight = 2000,
+    },
+    Aspd = {
+        MinStatAgi = 1,
+        MaxStatAgi = 255,
+        MinAspd = 140,
+        MaxAspd = 198,
+        SoftCapAspd = 190,
+        NearCapAspd = 195,
+        AgiExponent = 0.7,
+        DexContributionDivisor = 10,
+        BaseAttacksPerSecond = 1.0,
+        MaxAttacksPerSecond = 7.0,
+        ApsCurvePower = 1.5,
+        BaseAttackInterval = 1.0,
+        MinAttackInterval = 1 / 7,
+        FlatBonusCap = 3,
+    },
+    StatWeights = {
+        STR = {
+            physicalAttack = 2.0,
+            skillAttack = 0.4,
+            carryWeight = 30.0,
+            physicalDefense = 0.0,
+            upgradeLuck = 0.002,
+        },
+        AGI = {
+            flee = 2.0,
+            hit = 0.0,
+            critChance = 0.0,
+            statusResist = 0.0015,
+        },
+        VIT = {
+            health = 20.0,
+            physicalDefense = 1.5,
+            magicalDefense = 0.5,
+            statusResist = 0.0035,
+            healingPower = 0.01,
+        },
+        INT = {
+            magicAttack = 2.5,
+            mana = 10.0,
+            castSpeed = 0.008,
+            magicalDefense = 1.2,
+            statusResist = 0.003,
+        },
+        DEX = {
+            hit = 2.0,
+            physicalAttack = 0.2,
+            magicAttack = 0.0,
+            castSpeed = 0.0,
+            critChance = 0.05,
+        },
+        LUK = {
+            critChance = 0.3,
+            critDamage = 0.002,
+            flee = 1.0,
+            hit = 1.0,
+            perfectDodge = 0.1,
+            cardFind = 0.0025,
+            itemFind = 0.002,
+            upgradeLuck = 0.0045,
+            statusResist = 0.002,
+        },
+    },
+    Defense = {
+        SoftCap = 120,
+        MaxMitigation = 0.75,
+    },
+    Hit = {
+        MinimumChance = 0.1,
+        MaximumChance = 0.97,
+    },
+    Evasion = {
+        MinimumChance = 0.03,
+        MaximumChance = 0.45,
+    },
+    Crit = {
+        MaximumChance = 0.95,
+        MaximumDamageMultiplier = 2.5,
+    },
+    StatusResistance = {
+        Maximum = 0.6,
+    },
+    EnemyScaling = {
+        HealthPerLevel = 0.12,
+        AttackPerLevel = 0.08,
+        DefensePerLevel = 0.06,
+        RewardPerLevel = 0.1,
+    },
+}
+
+return StatBalanceConfig
