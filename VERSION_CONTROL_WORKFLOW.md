@@ -118,7 +118,29 @@ Start Rojo from this folder:
 
 ```powershell
 cd "C:\Users\lily7\Documents\SuperbulletAI\Lubot-RO"
-rojo serve default.project.json --port 13734
+rojo serve default.project.json --port 34872
+```
+
+Start Roblox Studio MCP bridge:
+
+```powershell
+cmd.exe /c %LOCALAPPDATA%\Roblox\mcp.bat
+```
+
+Expected MCP config:
+
+```json
+{
+  "mcpServers": {
+    "Roblox_Studio": {
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "%LOCALAPPDATA%\\Roblox\\mcp.bat"
+      ]
+    }
+  }
+}
 ```
 
 Commit and push:
@@ -138,4 +160,4 @@ As of setup:
 - local repo exists
 - GitHub remote exists
 - Rojo config exists in `default.project.json`
-- no Rojo server is assumed to be running unless started explicitly
+- default Rojo runtime target for this project is port `34872`
