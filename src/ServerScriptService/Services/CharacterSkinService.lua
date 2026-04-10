@@ -28,12 +28,40 @@ local FACE_COSMETIC_CLASSES = {
     Texture = true,
 }
 
+local CORE_CHARACTER_PART_NAMES = {
+    Head = true,
+    HumanoidRootPart = true,
+    Torso = true,
+    ['Left Arm'] = true,
+    ['Right Arm'] = true,
+    ['Left Leg'] = true,
+    ['Right Leg'] = true,
+    UpperTorso = true,
+    LowerTorso = true,
+    LeftUpperArm = true,
+    LeftLowerArm = true,
+    LeftHand = true,
+    RightUpperArm = true,
+    RightLowerArm = true,
+    RightHand = true,
+    LeftUpperLeg = true,
+    LeftLowerLeg = true,
+    LeftFoot = true,
+    RightUpperLeg = true,
+    RightLowerLeg = true,
+    RightFoot = true,
+}
+
 local function shouldCopyInstance(instance: Instance): boolean
     return COSMETIC_CLASSES[instance.ClassName] == true
 end
 
 local function shouldCopyFaceInstance(instance: Instance): boolean
     return FACE_COSMETIC_CLASSES[instance.ClassName] == true
+end
+
+local function isCoreCharacterPartName(name: string): boolean
+    return CORE_CHARACTER_PART_NAMES[name] == true
 end
 
 local function getPlayerCharactersFolder(): Folder?
@@ -176,6 +204,75 @@ local function findTemplateHead(template: Model): BasePart?
     return nil
 end
 
+local function clearSkinAddonParts(character: Model)
+    for _, child in ipairs(character:GetChildren()) do
+        if child:IsA('BasePart') and child:GetAttribute('SkinAddonPart') == true then
+            child:Destroy()
+        end
+    end
+end
+
+local function templatePartWeldedToHead(templatePart: BasePart, templateHead: BasePart): boolean
+    for _, child in ipairs(templatePart:GetChildren()) do
+        if child:IsA('Weld') then
+            if child.Part0 == templateHead or child.Part1 == templateHead then
+                return true
+            end
+        elseif child:IsA('WeldConstraint') then
+            if child.Part0 == templateHead or child.Part1 == templateHead then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function stripPartJoints(part: BasePart)
+    for _, descendant in ipairs(part:GetDescendants()) do
+        if descendant:IsA('Weld') or descendant:IsA('WeldConstraint') or descendant:IsA('Motor6D') then
+            descendant:Destroy()
+        end
+    end
+end
+
+local function applyTemplateHeadAddons(character: Model, template: Model)
+    clearSkinAddonParts(character)
+
+    local characterHead = character:FindFirstChild('Head')
+    local templateHead = findTemplateHead(template)
+    if not (characterHead and characterHead:IsA('BasePart') and templateHead) then
+        return
+    end
+
+    for _, descendant in ipairs(template:GetDescendants()) do
+        if descendant:IsA('BasePart') and descendant ~= templateHead then
+            if descendant:FindFirstAncestorOfClass('Accessory') then
+                continue
+            end
+            if isCoreCharacterPartName(descendant.Name) then
+                continue
+            end
+            if not templatePartWeldedToHead(descendant, templateHead) then
+                continue
+            end
+
+            local clonePart = descendant:Clone()
+            stripPartJoints(clonePart)
+            clonePart.Name = descendant.Name
+            clonePart.Anchored = false
+            clonePart.CanCollide = false
+            clonePart.Massless = true
+            clonePart:SetAttribute('SkinAddonPart', true)
+            clonePart.Parent = character
+
+            local weldConstraint = Instance.new('WeldConstraint')
+            weldConstraint.Part0 = clonePart
+            weldConstraint.Part1 = characterHead
+            weldConstraint.Parent = clonePart
+        end
+    end
+end
+
 local function applyTemplateFace(character: Model, template: Model)
     local characterHead = character:FindFirstChild('Head')
     if not (characterHead and characterHead:IsA('BasePart')) then
@@ -228,6 +325,7 @@ local function applyTemplateToCharacter(character: Model, template: Model)
     end
 
     applyTemplateFace(character, template)
+    applyTemplateHeadAddons(character, template)
 end
 
 local function applySkinToCharacter(player: Player, templateId: string)
