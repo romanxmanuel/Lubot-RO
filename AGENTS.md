@@ -32,6 +32,14 @@
 5. Commit and push after the feature is verified.
 6. Report the exact commit description in the response.
 
+### Playtest availability protocol (mandatory)
+
+1. During local-only work (planning, local file edits, git operations), Roman is **FREE to play test**.
+2. Right before any Studio write/sync step, stop play mode first, then announce: **NOT FREE to play test - saving/applying Studio changes now.**
+3. After Studio writes and verification are done and Studio is back in edit mode, announce: **FREE to play test again.**
+4. Assume Roman wants to play test while work is in progress unless told otherwise.
+5. End each completed prompt with Studio left in edit mode unless Roman explicitly asks to stay in play mode.
+
 Commit messages must be plain-language, specific, and easy to understand.
 
 ## Combat architecture (interchangeable systems)

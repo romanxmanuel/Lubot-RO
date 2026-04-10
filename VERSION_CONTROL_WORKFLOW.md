@@ -11,6 +11,9 @@ These are now mandatory for this project:
    - not vague, not over-technical
 3. Keep local files, Rojo sync, Studio runtime, and Git history aligned.
 4. Before any Studio file/script edit, always stop play test mode first.
+5. While work is local-only, Roman is free to keep playing in play test mode.
+6. Stop play only immediately before Studio write/sync steps, then announce "NOT FREE to play test" until Studio writes are done.
+7. After Studio writes are done, return Studio to edit mode and announce "FREE to play test again."
 
 ## Workspace split (locked)
 
@@ -86,22 +89,29 @@ Publish does **not**:
 
 When making a real game change, use this order:
 
-1. Stop play test mode
-   - Never edit Studio scripts while in play mode.
+1. Local coding phase (Roman free to play test)
+   - Do local analysis, file edits, and git prep first when possible.
 
-2. Edit the live Studio place
+2. Stop play test mode right before Studio changes
+   - Never edit Studio scripts while in play mode.
+   - Announce "NOT FREE to play test" before applying Studio changes.
+
+3. Edit the live Studio place
    - MCP and in-Studio work are allowed.
 
-3. Mirror the same change into local `src`
+4. Mirror the same change into local `src`
    - So the repo matches the live place.
 
-4. Team Test / runtime verify
+5. Team Test / runtime verify
    - Confirm behavior in live play.
 
-5. Commit and push the local repo
+6. Commit and push the local repo
    - This creates rollback history.
 
-6. Publish from Studio when Roman wants the live public game updated
+7. Publish from Studio when Roman wants the live public game updated
+
+8. Return to edit mode and announce "FREE to play test again"
+   - End each completed prompt with Studio ready for the next manual play session unless requested otherwise.
 
 ## Current project rule
 
