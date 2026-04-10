@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
 local ItemData = require(ReplicatedStorage.GameData.Items.ItemData)
 local SkillData = require(ReplicatedStorage.GameData.Skills.SkillData)
+local MMONet = require(ReplicatedStorage.Shared.Net.MMONet)
 local ToolFactory = require(script.Parent.Parent.Systems.Tools.ToolFactory)
 
 local InventoryServiceV2 = {
@@ -76,8 +77,10 @@ function InventoryServiceV2.start()
             return
         end
 
-        if payload.action == 'ToggleInventoryToolStash' then
+        if payload.action == MMONet.Actions.ToggleInventoryToolStash then
             InventoryServiceV2.toggleInventoryToolStash(player)
+        elseif payload.action == MMONet.Actions.StashInventoryTools then
+            InventoryServiceV2.stashInventoryTools(player)
         end
     end)
 end
@@ -243,6 +246,30 @@ function InventoryServiceV2.toggleInventoryToolStash(player: Player)
     dependencies.Runtime.SystemMessage:FireClient(
         player,
         nowStashed and 'Usable tools hidden from the hotbar.' or 'Usable tools restored to the hotbar.'
+    )
+end
+
+function InventoryServiceV2.stashInventoryTools(player: Player)
+    local nowStashed = false
+    local changed = false
+
+    dependencies.PersistenceService.updateProfile(player, function(profile)
+        if profile.inventoryToolsStashed == true then
+            nowStashed = true
+            return
+        end
+        profile.inventoryToolsStashed = true
+        nowStashed = true
+        changed = true
+    end)
+
+    if changed then
+        InventoryServiceV2.rebuildPlayerTools(player)
+    end
+
+    dependencies.Runtime.SystemMessage:FireClient(
+        player,
+        nowStashed and 'Moved current usable tools from hotbar into inventory.' or 'Hotbar tools are active.'
     )
 end
 

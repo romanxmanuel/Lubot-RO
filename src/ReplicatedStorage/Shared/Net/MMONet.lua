@@ -12,6 +12,7 @@ MMONet.Actions = {
     Warp = 'Warp',
     RandomTeleport = 'RandomTeleport',
     ToggleInventoryToolStash = 'ToggleInventoryToolStash',
+    StashInventoryTools = 'StashInventoryTools',
 }
 
 MMONet.Effects = {

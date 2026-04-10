@@ -19,6 +19,7 @@ local started = false
 local rootGui: ScreenGui? = nil
 local refs = {}
 local expanded = false
+local desiredInventoryVisible: boolean? = nil
 
 local COLLAPSED_SIZE = UDim2.fromOffset(288, 112)
 local EXPANDED_SIZE = UDim2.fromOffset(288, 318)
@@ -239,6 +240,58 @@ end
 
 local function fireStatRequest(payload)
 	dependencies.Runtime.StatRequest:FireServer(payload)
+end
+
+local function getNativeBackpackFrames()
+	local ok, coreGui = pcall(function()
+		return game:GetService("CoreGui")
+	end)
+	if not ok or not coreGui then
+		return nil, nil
+	end
+
+	local robloxGui = coreGui:FindFirstChild("RobloxGui")
+	if not robloxGui then
+		return nil, nil
+	end
+
+	local backpackGui = robloxGui:FindFirstChild("Backpack")
+	if not backpackGui then
+		return nil, nil
+	end
+
+	local inventoryFrame = backpackGui:FindFirstChild("Inventory")
+	local hotbarFrame = backpackGui:FindFirstChild("Hotbar")
+	if not (inventoryFrame and hotbarFrame) then
+		return nil, nil
+	end
+
+	if not inventoryFrame:IsA("GuiObject") or not hotbarFrame:IsA("GuiObject") then
+		return nil, nil
+	end
+
+	return inventoryFrame, hotbarFrame
+end
+
+local function toggleNativeInventoryWindow()
+	local inventoryFrame = getNativeBackpackFrames()
+	if not inventoryFrame then
+		warn("[HUDController] Native backpack inventory frame not found; cannot toggle window.")
+		return
+	end
+
+	desiredInventoryVisible = not inventoryFrame.Visible
+
+	task.spawn(function()
+		for _ = 1, 20 do
+			local currentInventoryFrame = getNativeBackpackFrames()
+			if not currentInventoryFrame then
+				break
+			end
+			currentInventoryFrame.Visible = desiredInventoryVisible == true
+			task.wait()
+		end
+	end)
 end
 
 local function refreshStatsSection()
@@ -556,21 +609,29 @@ local function ensureGui()
 	local utilityFrame = Instance.new("Frame")
 	utilityFrame.Name = "UtilityButtons"
 	utilityFrame.BackgroundTransparency = 1
-	utilityFrame.Size = UDim2.fromOffset(58, 26)
+	utilityFrame.Size = UDim2.fromOffset(118, 26)
 	utilityFrame.Position = UDim2.new(0, 306, 0, 12)
 	utilityFrame.ZIndex = 5
 	utilityFrame.Parent = rootGui
 
-    local stashButton = createButton(utilityFrame, "Hide", UDim2.fromOffset(56, 24), UDim2.fromOffset(0, 0))
+	local inventoryToggleButton = createButton(utilityFrame, "Show", UDim2.fromOffset(56, 24), UDim2.fromOffset(0, 0))
+	inventoryToggleButton.Name = "InventoryToggleButton"
+	inventoryToggleButton.TextSize = 10
+	inventoryToggleButton.MouseButton1Click:Connect(function()
+		toggleNativeInventoryWindow()
+	end)
+
+	local stashButton = createButton(utilityFrame, "Store", UDim2.fromOffset(56, 24), UDim2.fromOffset(60, 0))
 	stashButton.Name = "StashButton"
 	stashButton.TextSize = 10
 	stashButton.MouseButton1Click:Connect(function()
 		dependencies.Runtime.ActionRequest:FireServer({
-			action = MMONet.Actions.ToggleInventoryToolStash,
+			action = MMONet.Actions.StashInventoryTools,
 		})
 	end)
 
 	refs.utilityFrame = utilityFrame
+	refs.inventoryToggleButton = inventoryToggleButton
 	refs.stashButton = stashButton
 
 	applyExpansionVisualState()
@@ -621,8 +682,21 @@ local function updateSummary()
 	refs.jexpFill.Size = UDim2.fromScale(1, 1)
 	refs.jexpLabel.Text = string.format("LV %d", level)
 
+	local inventoryFrame = getNativeBackpackFrames()
+	if inventoryFrame and desiredInventoryVisible ~= nil and inventoryFrame.Visible ~= desiredInventoryVisible then
+		inventoryFrame.Visible = desiredInventoryVisible
+	end
+
+	if refs.inventoryToggleButton then
+		if inventoryFrame then
+			refs.inventoryToggleButton.Text = inventoryFrame.Visible and "Hide" or "Show"
+		else
+			refs.inventoryToggleButton.Text = "Bag"
+		end
+	end
+
 	local toolsStashed = localPlayer:GetAttribute("InventoryToolsStashed") == true
-    refs.stashButton.Text = toolsStashed and "Show" or "Hide"
+	refs.stashButton.Text = toolsStashed and "Stored" or "Store"
 
 	refreshStatsSection()
 end
