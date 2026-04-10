@@ -13,6 +13,7 @@ local loadedControllers = {
     ChatController = require(Controllers.ChatController),
     HUDController = require(Controllers.HUDController),
     CharacterAnimationController = require(Controllers.CharacterAnimationController),
+    CombatHandler = require(Controllers.CombatHandler),
     InputController = require(Controllers.InputController),
 }
 
@@ -23,6 +24,7 @@ local orderedControllers = {
     loadedControllers.ChatController,
     loadedControllers.HUDController,
     loadedControllers.CharacterAnimationController,
+    loadedControllers.CombatHandler,
     loadedControllers.InputController,
 }
 
