@@ -280,6 +280,10 @@ function ImportedAssetService.createToolClone(itemId: string): Tool?
     end
 
     local clone = template:Clone()
+    local itemDef = ItemData[itemId]
+    if itemDef and itemDef.displayName then
+        clone.Name = itemDef.displayName
+    end
     clone:SetAttribute('ImportedAssetId', template:GetAttribute('ImportedAssetId') or itemId)
     clone:SetAttribute('ImportedToolTemplate', template.Name)
     clone:SetAttribute('ImportedInputPriority', true)

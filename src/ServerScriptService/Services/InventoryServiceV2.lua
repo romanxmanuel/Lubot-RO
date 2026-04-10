@@ -151,6 +151,14 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 amount = 1,
             })
         end
+
+        local chaosEdgeEntry = getInventoryEntry(profile, 'imported_chaos_edge')
+        if not chaosEdgeEntry then
+            table.insert(profile.inventory, {
+                itemId = 'imported_chaos_edge',
+                amount = 1,
+            })
+        end
     end)
 end
 
