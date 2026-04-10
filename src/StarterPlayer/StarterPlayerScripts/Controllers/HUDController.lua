@@ -6,6 +6,7 @@ local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
 
 local StatConfig = require(ReplicatedStorage.Shared.Config.StatConfig)
 local MMONet = require(ReplicatedStorage.Shared.Net.MMONet)
@@ -21,6 +22,8 @@ local rootGui: ScreenGui? = nil
 local refs = {}
 local expanded = false
 local desiredInventoryVisible: boolean? = nil
+local backpackFrameCache: Instance? = nil
+local backpackFrameCacheExpiresAt = 0
 
 local COLLAPSED_SIZE = UDim2.fromOffset(288, 112)
 local EXPANDED_SIZE = UDim2.fromOffset(288, 318)
@@ -243,27 +246,64 @@ local function fireStatRequest(payload)
 	dependencies.Runtime.StatRequest:FireServer(payload)
 end
 
+local function isValidBackpackContainer(candidate: Instance?): boolean
+	if not candidate then
+		return false
+	end
+
+	local inventoryFrame = candidate:FindFirstChild("Inventory")
+	local hotbarFrame = candidate:FindFirstChild("Hotbar")
+	return inventoryFrame ~= nil
+		and hotbarFrame ~= nil
+		and inventoryFrame:IsA("GuiObject")
+		and hotbarFrame:IsA("GuiObject")
+end
+
+local function resolveBackpackContainer(): Instance?
+	local robloxGui = CoreGui:FindFirstChild("RobloxGui")
+	if robloxGui then
+		local direct = robloxGui:FindFirstChild("Backpack")
+		if isValidBackpackContainer(direct) then
+			return direct
+		end
+
+		for _, descendant in ipairs(robloxGui:GetDescendants()) do
+			if descendant.Name == "Backpack" and isValidBackpackContainer(descendant) then
+				return descendant
+			end
+		end
+	end
+
+	local directCore = CoreGui:FindFirstChild("Backpack")
+	if isValidBackpackContainer(directCore) then
+		return directCore
+	end
+
+	for _, descendant in ipairs(CoreGui:GetDescendants()) do
+		if descendant.Name == "Backpack" and isValidBackpackContainer(descendant) then
+			return descendant
+		end
+	end
+
+	return nil
+end
+
 local function getNativeBackpackFrames()
-	local ok, coreGui = pcall(function()
-		return game:GetService("CoreGui")
-	end)
-	if not ok or not coreGui then
+	local now = os.clock()
+	local backpackContainer = backpackFrameCache
+	if not backpackContainer or not backpackContainer.Parent or not isValidBackpackContainer(backpackContainer) or now >= backpackFrameCacheExpiresAt then
+		backpackContainer = resolveBackpackContainer()
+		backpackFrameCache = backpackContainer
+		backpackFrameCacheExpiresAt = now + 1
+	end
+
+	if not backpackContainer then
 		return nil, nil
 	end
 
-	local robloxGui = coreGui:FindFirstChild("RobloxGui")
-	if not robloxGui then
-		return nil, nil
-	end
-
-	local backpackGui = robloxGui:FindFirstChild("Backpack")
-	if not backpackGui then
-		return nil, nil
-	end
-
-	local inventoryFrame = backpackGui:FindFirstChild("Inventory")
-	local hotbarFrame = backpackGui:FindFirstChild("Hotbar")
-	if not (inventoryFrame and hotbarFrame) then
+	local inventoryFrame = backpackContainer:FindFirstChild("Inventory")
+	local hotbarFrame = backpackContainer:FindFirstChild("Hotbar")
+	if not inventoryFrame or not hotbarFrame then
 		return nil, nil
 	end
 
@@ -304,6 +344,38 @@ local function toggleNativeInventoryWindow()
 	if hotbarFrame then
 		hotbarFrame.Visible = true
 	end
+end
+
+local function moveHotbarToolsToInventoryWindow(): number
+	local inventoryFrame, hotbarFrame = getNativeBackpackFrames()
+	if not inventoryFrame or not hotbarFrame then
+		return 0
+	end
+
+	local scrollingFrame = inventoryFrame:FindFirstChild("ScrollingFrame")
+	if not scrollingFrame or not scrollingFrame:IsA("ScrollingFrame") then
+		return 0
+	end
+
+	local gridFrame = scrollingFrame:FindFirstChild("UIGridFrame")
+	if not gridFrame or not gridFrame:IsA("Frame") then
+		return 0
+	end
+
+	local movedCount = 0
+	for slotIndex = 1, 10 do
+		local slotButton = hotbarFrame:FindFirstChild(tostring(slotIndex))
+		if slotButton and slotButton:IsA("TextButton") then
+			local toolNameLabel = slotButton:FindFirstChild("ToolName")
+			if toolNameLabel and toolNameLabel:IsA("TextLabel") and toolNameLabel.Text ~= "" then
+				slotButton.Parent = gridFrame
+				movedCount += 1
+			end
+		end
+	end
+
+	hotbarFrame.Visible = true
+	return movedCount
 end
 
 local function refreshStatsSection()
@@ -637,10 +709,17 @@ local function ensureGui()
 	stashButton.Name = "StashButton"
 	stashButton.TextSize = 10
 	stashButton.MouseButton1Click:Connect(function()
+		local movedCount = moveHotbarToolsToInventoryWindow()
 		dependencies.Runtime.ActionRequest:FireServer({
 			action = MMONet.Actions.StashInventoryTools,
 		})
-		local inventoryFrame = getNativeBackpackFrames()
+		local inventoryFrame, hotbarFrame = getNativeBackpackFrames()
+		if hotbarFrame then
+			hotbarFrame.Visible = true
+		end
+		if movedCount > 0 then
+			desiredInventoryVisible = true
+		end
 		if inventoryFrame and not inventoryFrame.Visible then
 			toggleNativeInventoryWindow()
 		end
@@ -707,11 +786,7 @@ local function updateSummary()
 	end
 
 	if refs.inventoryToggleButton then
-		if inventoryFrame then
-			refs.inventoryToggleButton.Text = inventoryFrame.Visible and "Hide" or "Show"
-		else
-			refs.inventoryToggleButton.Text = "Bag"
-		end
+		refs.inventoryToggleButton.Text = "Bag"
 	end
 
 	refs.stashButton.Text = "Store"
