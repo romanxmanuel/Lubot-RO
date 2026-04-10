@@ -8,6 +8,7 @@ Character skin templates used by CharacterSkinService.
 CURRENT TEMPLATES:
 - DekuCharacterTemplate (default)
 - GojoWhiteCharacterTemplate (import source asset id 91131914057854)
+- LuffyCharacterTemplate (import source asset id 9465786796)
 - LuffyGear5CharacterTemplate (import source asset id 10039008438)
 
 NOTES:
