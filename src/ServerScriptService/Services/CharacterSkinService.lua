@@ -23,8 +23,17 @@ local COSMETIC_CLASSES = {
     CharacterMesh = true,
 }
 
+local FACE_COSMETIC_CLASSES = {
+    Decal = true,
+    Texture = true,
+}
+
 local function shouldCopyInstance(instance: Instance): boolean
     return COSMETIC_CLASSES[instance.ClassName] == true
+end
+
+local function shouldCopyFaceInstance(instance: Instance): boolean
+    return FACE_COSMETIC_CLASSES[instance.ClassName] == true
 end
 
 local function getPlayerCharactersFolder(): Folder?
@@ -150,6 +159,43 @@ local function clearSkinCosmetics(character: Model)
     end
 end
 
+local function clearFaceCosmetics(head: BasePart)
+    for _, child in ipairs(head:GetChildren()) do
+        if shouldCopyFaceInstance(child) then
+            child:Destroy()
+        end
+    end
+end
+
+local function findTemplateHead(template: Model): BasePart?
+    for _, descendant in ipairs(template:GetDescendants()) do
+        if descendant:IsA('BasePart') and descendant.Name == 'Head' then
+            return descendant
+        end
+    end
+    return nil
+end
+
+local function applyTemplateFace(character: Model, template: Model)
+    local characterHead = character:FindFirstChild('Head')
+    if not (characterHead and characterHead:IsA('BasePart')) then
+        return
+    end
+
+    clearFaceCosmetics(characterHead)
+
+    local templateHead = findTemplateHead(template)
+    if not templateHead then
+        return
+    end
+
+    for _, child in ipairs(templateHead:GetChildren()) do
+        if shouldCopyFaceInstance(child) then
+            child:Clone().Parent = characterHead
+        end
+    end
+end
+
 local function extractHumanoidDescription(template: Model): HumanoidDescription?
     for _, descendant in ipairs(template:GetDescendants()) do
         if descendant:IsA('Humanoid') then
@@ -180,6 +226,8 @@ local function applyTemplateToCharacter(character: Model, template: Model)
             descendant:Clone().Parent = character
         end
     end
+
+    applyTemplateFace(character, template)
 end
 
 local function applySkinToCharacter(player: Player, templateId: string)
