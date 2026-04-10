@@ -129,10 +129,6 @@ local function toolOwnsActionInput(keyCode: Enum.KeyCode): boolean
 end
 
 local function tryInfiniteJump()
-    if GameConfig.EnableInfiniteJump ~= true then
-        return
-    end
-
     local character = localPlayer.Character
     if not character then
         return
@@ -141,10 +137,6 @@ local function tryInfiniteJump()
     local humanoid = character:FindFirstChildOfClass('Humanoid')
     local root = character:FindFirstChild('HumanoidRootPart')
     if not humanoid or not root then
-        return
-    end
-
-    if humanoid.FloorMaterial ~= Enum.Material.Air then
         return
     end
 
