@@ -14,6 +14,7 @@ local loadedControllers = {
     HUDController = require(Controllers.HUDController),
     CharacterAnimationController = require(Controllers.CharacterAnimationController),
     CombatHandler = require(Controllers.CombatHandler),
+    QuickCastController = require(Controllers.QuickCastController),
     InputController = require(Controllers.InputController),
 }
 
@@ -25,6 +26,7 @@ local orderedControllers = {
     loadedControllers.HUDController,
     loadedControllers.CharacterAnimationController,
     loadedControllers.CombatHandler,
+    loadedControllers.QuickCastController,
     loadedControllers.InputController,
 }
 
