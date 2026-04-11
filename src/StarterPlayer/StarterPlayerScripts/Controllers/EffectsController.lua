@@ -336,6 +336,31 @@ local function emitCloneParticles(instance: Instance, burstCount: number?)
     end
 end
 
+local function fadeCloneVisuals(instance: Instance, fadeDuration: number)
+    local duration = math.max(fadeDuration, 0.08)
+
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA('ParticleEmitter') then
+            descendant.Enabled = false
+        elseif descendant:IsA('Trail') then
+            descendant.Enabled = false
+            descendant.Lifetime = descendant.Lifetime * 0.35
+        elseif descendant:IsA('Beam') then
+            descendant.Enabled = false
+            descendant.Width0 = descendant.Width0 * 0.35
+            descendant.Width1 = descendant.Width1 * 0.35
+            descendant.Transparency = NumberSequence.new(1)
+        end
+    end
+
+    forEachClonePart(instance, function(part: BasePart)
+        local tween = TweenService:Create(part, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Transparency = 1,
+        })
+        tween:Play()
+    end)
+end
+
 local function animateCloneMotion(clone: Instance, duration: number, updater)
     local safeDuration = math.max(duration, 0.05)
     local startedAt = os.clock()
@@ -771,6 +796,8 @@ local function playNovaStrikeEffect(payload)
     local duration = tonumber(vfx.duration) or 0.24
     local spin = tonumber(vfx.spin) or 2
     local look = getPlanarLookAndRight(direction)
+    local startOffset = 2.8
+    local travelDistance = range * 0.74
 
     local clone = cloneMarketplaceTemplate('NovaStrike')
     if not clone then
@@ -779,18 +806,24 @@ local function playNovaStrikeEffect(payload)
     end
 
     setCloneTransparency(clone, 0.05)
-    scaleCloneVisuals(clone, 1.22)
-    emitCloneParticles(clone, 36)
+    scaleCloneVisuals(clone, 0.62)
+    emitCloneParticles(clone, 28)
 
     animateCloneMotion(clone, duration, function(alpha)
         local eased = alpha * alpha * (3 - 2 * alpha)
-        local position = origin + Vector3.new(0, 2.1, 0) + look * (range * eased)
+        local position = origin + Vector3.new(0, 1.95, 0) + look * (startOffset + (travelDistance * eased))
         placeClone(clone, CFrame.lookAt(position, position + look) * CFrame.Angles(0, math.rad(560 * alpha * spin), 0))
-        setCloneTransparency(clone, 0.06 + math.max(alpha - 0.65, 0) * 2.6)
+        setCloneTransparency(clone, 0.08 + math.max(alpha - 0.62, 0) * 1.65)
+    end)
+
+    task.delay(duration * 0.86, function()
+        if clone.Parent then
+            fadeCloneVisuals(clone, 0.16)
+        end
     end)
 
     task.delay(duration * 0.9, function()
-        local hitPosition = origin + Vector3.new(0, 2.1, 0) + look * range
+        local hitPosition = origin + Vector3.new(0, 1.95, 0) + look * (startOffset + travelDistance)
         local burst = makeEffectPart(
             Color3.fromRGB(190, 222, 255),
             Vector3.new(2.2, 2.2, 2.2),
