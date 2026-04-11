@@ -14,6 +14,11 @@ return {
         },
         starterSkills = {
             'power_slash',
+            'arc_flare',
+            'nova_strike',
+            'vortex_spin',
+            'comet_drop',
+            'razor_orbit',
         },
     },
 }

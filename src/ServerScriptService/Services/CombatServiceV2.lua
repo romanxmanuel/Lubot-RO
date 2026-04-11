@@ -10,6 +10,46 @@ local CombatServiceV2 = {
 }
 
 local dependencies = nil
+local HIGH_TARGET_CAP = 16
+
+local SKILL_BEHAVIOR = {
+    power_slash = {
+        effect = MMONet.Effects.PowerSlash,
+        shape = 'cone',
+        dotThreshold = 0.2,
+        maxTargets = 3,
+    },
+    arc_flare = {
+        effect = MMONet.Effects.ArcFlare,
+        shape = 'cone',
+        dotThreshold = 0.35,
+        maxTargets = 4,
+    },
+    nova_strike = {
+        effect = MMONet.Effects.NovaStrike,
+        shape = 'cone',
+        dotThreshold = 0.75,
+        maxTargets = 2,
+    },
+    vortex_spin = {
+        effect = MMONet.Effects.VortexSpin,
+        shape = 'radial',
+        dotThreshold = -1,
+        maxTargets = 8,
+    },
+    comet_drop = {
+        effect = MMONet.Effects.CometDrop,
+        shape = 'radial',
+        dotThreshold = -1,
+        maxTargets = 10,
+    },
+    razor_orbit = {
+        effect = MMONet.Effects.RazorOrbit,
+        shape = 'cone',
+        dotThreshold = 0.05,
+        maxTargets = 6,
+    },
+}
 
 local function getForwardVector(player: Player)
     local root = dependencies.CharacterService.getHumanoidRootPart(player)
@@ -91,11 +131,12 @@ function CombatServiceV2.performSkill(player: Player, skillId: string, skillDef)
         return false
     end
 
-    if skillId ~= 'power_slash' then
+    local behavior = SKILL_BEHAVIOR[skillId]
+    if not behavior then
         return false
     end
 
-    dependencies.Runtime.EffectEvent:FireAllClients(MMONet.Effects.PowerSlash, {
+    dependencies.Runtime.EffectEvent:FireAllClients(behavior.effect, {
         userId = player.UserId,
         origin = origin,
         direction = lookVector,
@@ -103,7 +144,25 @@ function CombatServiceV2.performSkill(player: Player, skillId: string, skillDef)
         width = skillDef.width,
     })
 
-    local enemies = dependencies.EnemyService.findEnemiesInCone(origin, lookVector, skillDef.range, 0.2, 3)
+    local enemies = {}
+    if behavior.shape == 'radial' then
+        enemies = dependencies.EnemyService.findEnemiesInCone(
+            origin,
+            lookVector,
+            skillDef.range,
+            behavior.dotThreshold or -1,
+            math.min(HIGH_TARGET_CAP, skillDef.maxTargets or behavior.maxTargets or HIGH_TARGET_CAP)
+        )
+    else
+        enemies = dependencies.EnemyService.findEnemiesInCone(
+            origin,
+            lookVector,
+            skillDef.range,
+            behavior.dotThreshold or 0.2,
+            skillDef.maxTargets or behavior.maxTargets or 3
+        )
+    end
+
     for _, enemyId in ipairs(enemies) do
         dependencies.EnemyService.damageEnemy(enemyId, skillDef.damage, player)
     end

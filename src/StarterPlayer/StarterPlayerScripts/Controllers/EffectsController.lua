@@ -14,6 +14,7 @@ local EffectsController = {
 local dependencies = nil
 local DASH_TEXTURE = 'rbxassetid://7216979807'
 local ATTACK_SOUND_ID = 'rbxassetid://134072730260352'
+local MARKETPLACE_TEMPLATE_FOLDER = 'MarketplaceVfx7564537285'
 
 local function getSkinBurstPalette(templateId: string?): (Color3, Color3)
     if templateId == 'DekuCharacterTemplate' then
@@ -32,10 +33,94 @@ local function getDekuFxFolder(): Folder?
     return nil
 end
 
+local function getMarketplaceVfxFolder(): Folder?
+    local gameParts = ReplicatedStorage:FindFirstChild('GameParts')
+    local fxRoot = gameParts and gameParts:FindFirstChild('FX')
+    local folder = fxRoot and fxRoot:FindFirstChild(MARKETPLACE_TEMPLATE_FOLDER)
+    if folder and folder:IsA('Folder') then
+        return folder
+    end
+    return nil
+end
+
 local function getFxParent(): Instance
     local spawnedRoot = Workspace:FindFirstChild('SpawnedDuringPlay')
     local fxFolder = spawnedRoot and spawnedRoot:FindFirstChild('FX')
     return fxFolder or Workspace
+end
+
+local function normalizeEffectClone(instance: Instance)
+    if instance:IsA('BasePart') then
+        instance.Anchored = true
+        instance.CanCollide = false
+        instance.CanTouch = false
+        instance.CanQuery = false
+    end
+
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA('BasePart') then
+            descendant.Anchored = true
+            descendant.CanCollide = false
+            descendant.CanTouch = false
+            descendant.CanQuery = false
+        end
+    end
+end
+
+local function setCloneColor(instance: Instance, color: Color3)
+    if instance:IsA('BasePart') then
+        instance.Color = color
+        return
+    end
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA('BasePart') then
+            descendant.Color = color
+        end
+    end
+end
+
+local function setCloneTransparency(instance: Instance, transparency: number)
+    if instance:IsA('BasePart') then
+        instance.Transparency = transparency
+        return
+    end
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA('BasePart') then
+            descendant.Transparency = transparency
+        end
+    end
+end
+
+local function placeClone(instance: Instance, cframe: CFrame)
+    if instance:IsA('Model') then
+        if not instance.PrimaryPart then
+            local firstPart = instance:FindFirstChildWhichIsA('BasePart', true)
+            if firstPart then
+                instance.PrimaryPart = firstPart
+            end
+        end
+        if instance.PrimaryPart then
+            instance:PivotTo(cframe)
+        end
+        return
+    end
+
+    if instance:IsA('BasePart') then
+        instance.CFrame = cframe
+    end
+end
+
+local function cloneMarketplaceTemplate(templateName: string): Instance?
+    local folder = getMarketplaceVfxFolder()
+    local template = folder and folder:FindFirstChild(templateName)
+    if not template then
+        return nil
+    end
+
+    local clone = template:Clone()
+    normalizeEffectClone(clone)
+    clone.Parent = getFxParent()
+    return clone
 end
 
 local function playWorldSound(soundId: string, position: Vector3, volume: number, playbackSpeed: number, lifetime: number)
@@ -312,6 +397,116 @@ local function playSlashEffect(payload, color: Color3, width: number)
     })
 end
 
+local function playArcFlareEffect(payload)
+    local direction = payload.direction or Vector3.new(0, 0, -1)
+    local origin = payload.origin or Vector3.zero
+    local range = payload.range or 18
+    local look = direction.Magnitude > 0.001 and direction.Unit or Vector3.new(0, 0, -1)
+
+    local clone = cloneMarketplaceTemplate('ArcFlare')
+    if clone then
+        setCloneColor(clone, Color3.fromRGB(119, 236, 255))
+        setCloneTransparency(clone, 0.15)
+        placeClone(clone, CFrame.lookAt(origin + Vector3.new(0, 2.6, 0), origin + Vector3.new(look.X, 2.6, look.Z)) * CFrame.new(0, 0, -range * 0.38))
+        task.delay(0.18, function()
+            if clone.Parent then
+                setCloneTransparency(clone, 1)
+                Debris:AddItem(clone, 0.06)
+            end
+        end)
+    else
+        playSlashEffect(payload, Color3.fromRGB(119, 236, 255), payload.width or 9)
+    end
+end
+
+local function playNovaStrikeEffect(payload)
+    local direction = payload.direction or Vector3.new(0, 0, -1)
+    local origin = payload.origin or Vector3.zero
+    local range = payload.range or 24
+    local look = direction.Magnitude > 0.001 and direction.Unit or Vector3.new(0, 0, -1)
+
+    local clone = cloneMarketplaceTemplate('NovaStrike')
+    if clone then
+        setCloneColor(clone, Color3.fromRGB(166, 204, 255))
+        setCloneTransparency(clone, 0.1)
+        placeClone(clone, CFrame.lookAt(origin + Vector3.new(0, 2.2, 0), origin + Vector3.new(look.X, 2.2, look.Z)) * CFrame.new(0, 0, -range * 0.48))
+        task.delay(0.2, function()
+            if clone.Parent then
+                setCloneTransparency(clone, 1)
+                Debris:AddItem(clone, 0.06)
+            end
+        end)
+    else
+        playSlashEffect(payload, Color3.fromRGB(166, 204, 255), payload.width or 5)
+    end
+end
+
+local function playVortexSpinEffect(payload)
+    local origin = payload.origin or Vector3.zero
+    local clone = cloneMarketplaceTemplate('VortexSpin')
+    if clone then
+        setCloneColor(clone, Color3.fromRGB(194, 132, 255))
+        setCloneTransparency(clone, 0.22)
+        placeClone(clone, CFrame.new(origin + Vector3.new(0, 2.2, 0)))
+        task.delay(0.26, function()
+            if clone.Parent then
+                setCloneTransparency(clone, 1)
+                Debris:AddItem(clone, 0.08)
+            end
+        end)
+    else
+        playSlashEffect(payload, Color3.fromRGB(194, 132, 255), payload.width or 12)
+    end
+end
+
+local function playCometDropEffect(payload)
+    local origin = payload.origin or Vector3.zero
+    local direction = payload.direction or Vector3.new(0, 0, -1)
+    local look = direction.Magnitude > 0.001 and direction.Unit or Vector3.new(0, 0, -1)
+
+    local clone = cloneMarketplaceTemplate('CometDrop')
+    if clone then
+        setCloneColor(clone, Color3.fromRGB(255, 176, 118))
+        setCloneTransparency(clone, 0.16)
+        placeClone(clone, CFrame.lookAt(origin + Vector3.new(0, 18, 0), origin + Vector3.new(look.X, 18, look.Z)))
+        task.delay(0.15, function()
+            if clone.Parent then
+                placeClone(clone, CFrame.lookAt(origin + Vector3.new(0, 2, 0), origin + Vector3.new(look.X, 2, look.Z)))
+                setCloneTransparency(clone, 0.35)
+            end
+        end)
+        task.delay(0.32, function()
+            if clone.Parent then
+                setCloneTransparency(clone, 1)
+                Debris:AddItem(clone, 0.08)
+            end
+        end)
+    else
+        playSlashEffect(payload, Color3.fromRGB(255, 176, 118), payload.width or 14)
+    end
+end
+
+local function playRazorOrbitEffect(payload)
+    local origin = payload.origin or Vector3.zero
+    local direction = payload.direction or Vector3.new(0, 0, -1)
+    local look = direction.Magnitude > 0.001 and direction.Unit or Vector3.new(0, 0, -1)
+
+    local clone = cloneMarketplaceTemplate('RazorOrbit')
+    if clone then
+        setCloneColor(clone, Color3.fromRGB(205, 246, 255))
+        setCloneTransparency(clone, 0.2)
+        placeClone(clone, CFrame.lookAt(origin + Vector3.new(0, 2.3, 0), origin + Vector3.new(look.X, 2.3, look.Z)))
+        task.delay(0.22, function()
+            if clone.Parent then
+                setCloneTransparency(clone, 1)
+                Debris:AddItem(clone, 0.08)
+            end
+        end)
+    else
+        playSlashEffect(payload, Color3.fromRGB(205, 246, 255), payload.width or 10)
+    end
+end
+
 local function playEnemyAttackEffect(payload)
     local position = payload.position or Vector3.zero
     local targetPosition = payload.targetPosition or position
@@ -531,6 +726,16 @@ function EffectsController.start()
             playSlashEffect(payload, Color3.fromRGB(210, 240, 255), 4)
         elseif effectName == MMONet.Effects.PowerSlash then
             playSlashEffect(payload, Color3.fromRGB(106, 228, 255), payload.width or 8)
+        elseif effectName == MMONet.Effects.ArcFlare then
+            playArcFlareEffect(payload)
+        elseif effectName == MMONet.Effects.NovaStrike then
+            playNovaStrikeEffect(payload)
+        elseif effectName == MMONet.Effects.VortexSpin then
+            playVortexSpinEffect(payload)
+        elseif effectName == MMONet.Effects.CometDrop then
+            playCometDropEffect(payload)
+        elseif effectName == MMONet.Effects.RazorOrbit then
+            playRazorOrbitEffect(payload)
         elseif effectName == MMONet.Effects.EnemyAttack then
             playEnemyAttackEffect(payload)
         elseif effectName == MMONet.Effects.EnemyHit then

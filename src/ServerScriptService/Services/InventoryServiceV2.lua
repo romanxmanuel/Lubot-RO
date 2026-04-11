@@ -13,6 +13,14 @@ local InventoryServiceV2 = {
 }
 
 local dependencies = nil
+local STARTER_SKILL_IDS = {
+    'power_slash',
+    'arc_flare',
+    'nova_strike',
+    'vortex_spin',
+    'comet_drop',
+    'razor_orbit',
+}
 
 local function getInventoryEntry(profile, itemId: string)
     for _, entry in ipairs(profile.inventory) do
@@ -87,14 +95,28 @@ end
 
 function InventoryServiceV2.ensureStarterLoadout(player: Player)
     dependencies.PersistenceService.updateProfile(player, function(profile)
+        local function ensureSkill(list, skillId: string)
+            for _, existing in ipairs(list) do
+                if existing == skillId then
+                    return
+                end
+            end
+            table.insert(list, skillId)
+        end
+
         profile.equippedWeaponId = ''
         profile.inventoryToolsStashed = false
 
-        if #profile.unlockedSkills == 0 then
-            table.insert(profile.unlockedSkills, 'power_slash')
-        end
-        if #profile.skillLoadout == 0 then
-            table.insert(profile.skillLoadout, 'power_slash')
+        if #profile.unlockedSkills == 0 and #profile.skillLoadout == 0 then
+            for _, starterSkillId in ipairs(STARTER_SKILL_IDS) do
+                table.insert(profile.unlockedSkills, starterSkillId)
+                table.insert(profile.skillLoadout, starterSkillId)
+            end
+        else
+            for _, starterSkillId in ipairs(STARTER_SKILL_IDS) do
+                ensureSkill(profile.unlockedSkills, starterSkillId)
+                ensureSkill(profile.skillLoadout, starterSkillId)
+            end
         end
 
         local potionEntry = getInventoryEntry(profile, 'minor_healing_potion')
@@ -103,6 +125,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 itemId = 'minor_healing_potion',
                 amount = 3,
             })
+        elseif potionEntry.amount < 1 then
+            potionEntry.amount = 1
         end
 
         for index = #profile.inventory, 1, -1 do
@@ -118,6 +142,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 itemId = 'deku_combat_emblem',
                 amount = 1,
             })
+        elseif styleEntry.amount < 1 then
+            styleEntry.amount = 1
         end
 
         local dekuSkinEntry = getInventoryEntry(profile, 'deku_skin')
@@ -126,6 +152,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 itemId = 'deku_skin',
                 amount = 1,
             })
+        elseif dekuSkinEntry.amount < 1 then
+            dekuSkinEntry.amount = 1
         end
 
         local gojoWhiteSkinEntry = getInventoryEntry(profile, 'gojo_white_skin')
@@ -134,6 +162,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 itemId = 'gojo_white_skin',
                 amount = 1,
             })
+        elseif gojoWhiteSkinEntry.amount < 1 then
+            gojoWhiteSkinEntry.amount = 1
         end
 
         local luffySkinEntry = getInventoryEntry(profile, 'luffy_skin')
@@ -142,6 +172,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 itemId = 'luffy_skin',
                 amount = 1,
             })
+        elseif luffySkinEntry.amount < 1 then
+            luffySkinEntry.amount = 1
         end
 
         local luffyGear5SkinEntry = getInventoryEntry(profile, 'luffy_gear_5_skin')
@@ -150,6 +182,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 itemId = 'luffy_gear_5_skin',
                 amount = 1,
             })
+        elseif luffyGear5SkinEntry.amount < 1 then
+            luffyGear5SkinEntry.amount = 1
         end
 
         local chaosEdgeEntry = getInventoryEntry(profile, 'imported_chaos_edge')
@@ -158,6 +192,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 itemId = 'imported_chaos_edge',
                 amount = 1,
             })
+        elseif chaosEdgeEntry.amount < 1 then
+            chaosEdgeEntry.amount = 1
         end
 
         local sukunaSkinEntry = getInventoryEntry(profile, 'sukuna_skin')
@@ -166,6 +202,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 itemId = 'sukuna_skin',
                 amount = 1,
             })
+        elseif sukunaSkinEntry.amount < 1 then
+            sukunaSkinEntry.amount = 1
         end
 
         local dekuOneForAllSkinEntry = getInventoryEntry(profile, 'deku_one_for_all_skin')
@@ -174,6 +212,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 itemId = 'deku_one_for_all_skin',
                 amount = 1,
             })
+        elseif dekuOneForAllSkinEntry.amount < 1 then
+            dekuOneForAllSkinEntry.amount = 1
         end
 
         local susanooSasukeSkinEntry = getInventoryEntry(profile, 'susanoo_sasuke_skin')
@@ -182,6 +222,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
                 itemId = 'susanoo_sasuke_skin',
                 amount = 1,
             })
+        elseif susanooSasukeSkinEntry.amount < 1 then
+            susanooSasukeSkinEntry.amount = 1
         end
     end)
 end
@@ -192,9 +234,27 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
         return
     end
 
+    local function ensureSkill(list, skillId: string)
+        for _, existing in ipairs(list) do
+            if existing == skillId then
+                return
+            end
+        end
+        table.insert(list, skillId)
+    end
+
     local backpack = player:FindFirstChildOfClass('Backpack') or player:WaitForChild('Backpack', 5)
     if not backpack then
         return
+    end
+
+    if #profile.skillLoadout == 0 then
+        for _, starterSkillId in ipairs(STARTER_SKILL_IDS) do
+            table.insert(profile.skillLoadout, starterSkillId)
+        end
+    end
+    for _, starterSkillId in ipairs(STARTER_SKILL_IDS) do
+        ensureSkill(profile.unlockedSkills, starterSkillId)
     end
 
     destroyTools(backpack)
