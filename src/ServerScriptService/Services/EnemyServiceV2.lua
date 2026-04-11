@@ -500,6 +500,8 @@ local function getLivePlayerByUserId(userId: number)
     return nil
 end
 
+local clampPositionAwayFromTarget
+
 local function startMeleeAttack(state: EnemyState, targetEntry, now: number)
     local offset = targetEntry.root.Position - state.root.Position
     local planar = Vector3.new(offset.X, 0, offset.Z)
@@ -511,12 +513,15 @@ local function startMeleeAttack(state: EnemyState, targetEntry, now: number)
     local windupDuration = state.def.attackWindup or (state.plan.isBoss and 0.28 or 0.2)
     local lungeDuration = state.def.attackLungeDuration or (state.plan.isBoss and 0.24 or 0.18)
     local recoverDuration = state.def.attackRecoverDuration or (state.plan.isBoss and 0.32 or 0.24)
-    local lungeDistance = math.max(2.6, math.min(planar.Magnitude + 1.2, state.def.attackRange + 3.6))
+    local minStrikeDistance = state.def.attackMinDistance or (state.plan.isBoss and 4.8 or 3.4)
+    local desiredStrikeDistance = math.max(minStrikeDistance, math.min(planar.Magnitude + 1.2, state.def.attackRange + 3.6))
 
-    local strikeProbe = state.root.Position + forward * lungeDistance
+    local strikeProbe = targetEntry.root.Position - forward * desiredStrikeDistance
     local strikePosition = resolveGroundedPositionAt(state.plan.mapModel, strikeProbe, state.def)
+    strikePosition = clampPositionAwayFromTarget(state, targetEntry.root.Position, strikePosition, forward)
     local recoverProbe = strikePosition - forward * math.max(1, state.def.attackRange * 0.2)
     local recoverPosition = resolveGroundedPositionAt(state.plan.mapModel, recoverProbe, state.def)
+    recoverPosition = clampPositionAwayFromTarget(state, targetEntry.root.Position, recoverPosition, forward)
 
     state.attackState = {
         targetUserId = targetEntry.player.UserId,
@@ -558,6 +563,7 @@ local function stepActiveAttack(state: EnemyState, now: number): boolean
         local backstep = math.sin(alpha * math.pi * 0.5) * math.max(0.7, state.def.attackRange * 0.14)
         local rise = math.sin(alpha * math.pi) * (state.plan.isBoss and 1 or 0.6)
         local position = attackState.origin - forward * backstep + Vector3.new(0, rise, 0)
+        position = clampPositionAwayFromTarget(state, targetPosition, position, forward)
         setEnemyPosition(state, position, targetPosition)
 
         if alpha >= 1 then
@@ -573,6 +579,7 @@ local function stepActiveAttack(state: EnemyState, now: number): boolean
         local launch = attackState.origin:Lerp(attackState.strikePosition, alpha)
         local arc = math.sin(alpha * math.pi) * (state.plan.isBoss and 1.3 or 0.8)
         local position = launch + Vector3.new(0, arc, 0)
+        position = clampPositionAwayFromTarget(state, targetPosition, position, forward)
         setEnemyPosition(state, position, targetPosition)
 
         local impactRange = state.def.attackRange + (state.plan.isBoss and 2.8 or 1.8)
@@ -594,6 +601,7 @@ local function stepActiveAttack(state: EnemyState, now: number): boolean
 
     local recoverAlpha = math.clamp((now - attackState.phaseStartedAt) / math.max(attackState.recoverDuration, 0.01), 0, 1)
     local settle = attackState.strikePosition:Lerp(attackState.recoverPosition, recoverAlpha)
+    settle = clampPositionAwayFromTarget(state, targetPosition, settle, forward)
     setEnemyPosition(state, settle, targetPosition)
     if recoverAlpha >= 1 then
         state.attackState = nil
@@ -607,6 +615,25 @@ local function damagePlayerIfClose(playerEntry, position: Vector3, radius: numbe
         return true
     end
     return false
+end
+
+clampPositionAwayFromTarget = function(state: EnemyState, targetPosition: Vector3, candidatePosition: Vector3, forwardHint: Vector3): Vector3
+    local minSeparation = state.def.attackMinDistance or (state.plan.isBoss and 5 or 3.6)
+    minSeparation = math.max(minSeparation, getRootHalfHeight(state.def) * 0.65 + 1.8)
+
+    local planarOffset = Vector3.new(candidatePosition.X - targetPosition.X, 0, candidatePosition.Z - targetPosition.Z)
+    local planarDistance = planarOffset.Magnitude
+    if planarDistance >= minSeparation then
+        return candidatePosition
+    end
+
+    local awayDirection = if planarDistance > 0.001 then planarOffset.Unit else -forwardHint
+    if awayDirection.Magnitude <= 0.001 then
+        awayDirection = Vector3.new(0, 0, -1)
+    end
+
+    local clampedProbe = targetPosition + awayDirection * minSeparation
+    return resolveGroundedPositionAt(state.plan.mapModel, clampedProbe, state.def)
 end
 
 local function performSpecialAttack(state: EnemyState, closest, distance: number): boolean
@@ -631,8 +658,9 @@ local function performSpecialAttack(state: EnemyState, closest, distance: number
     local now = os.clock()
 
     if style == 'pounce' then
-        local landing = targetPosition - planar.Unit * math.max(3.5, state.def.attackRange * 0.55)
+        local landing = targetPosition - planar.Unit * math.max(4.2, state.def.attackRange * 0.7)
         local finalPosition = resolveGroundedPositionAt(state.plan.mapModel, landing, state.def)
+        finalPosition = clampPositionAwayFromTarget(state, targetPosition, finalPosition, planar.Unit)
         setEnemyPosition(state, finalPosition, targetPosition)
         fireEnemyAttackEffect(state, state.def.attackEffect or 'FrostPounce', targetPosition)
         damagePlayerIfClose(closest, finalPosition, state.def.attackRange + 3, specialDamage)
@@ -640,9 +668,12 @@ local function performSpecialAttack(state: EnemyState, closest, distance: number
         fireEnemyAttackEffect(state, state.def.attackEffect or 'PetalBolt', targetPosition)
         dependencies.CharacterService.damagePlayer(closest.player, specialDamage)
     elseif style == 'charge' then
-        local travel = math.min(planar.Magnitude, math.max(10, state.def.specialRange * 0.75))
+        local minSeparation = state.def.attackMinDistance or (state.plan.isBoss and 5 or 3.6)
+        local maxTravel = math.max(0, planar.Magnitude - minSeparation)
+        local travel = math.min(maxTravel, math.max(10, state.def.specialRange * 0.75))
         local chargePosition = state.root.Position + planar.Unit * travel
         local finalPosition = resolveGroundedPositionAt(state.plan.mapModel, chargePosition, state.def)
+        finalPosition = clampPositionAwayFromTarget(state, targetPosition, finalPosition, planar.Unit)
         setEnemyPosition(state, finalPosition, targetPosition)
         fireEnemyAttackEffect(state, state.def.attackEffect or 'ShardCharge', targetPosition)
         damagePlayerIfClose(closest, finalPosition, state.def.attackRange + 4, specialDamage)
