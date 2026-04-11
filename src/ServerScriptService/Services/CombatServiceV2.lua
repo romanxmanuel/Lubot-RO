@@ -15,6 +15,8 @@ local CombatServiceV2 = {
 
 local dependencies = nil
 local HIGH_TARGET_CAP = 16
+local IMPACT_RANGE_SCALE = 1.12
+local IMPACT_WIDTH_SCALE = 1.25
 
 local SKILL_BEHAVIOR = {
     power_slash = {
@@ -119,14 +121,17 @@ local function runSkillTimeline(player: Player, root: BasePart, initialLook: Vec
         end
 
         local effectName = resolveEffectName(phase.effect or (SKILL_BEHAVIOR[skillId] and SKILL_BEHAVIOR[skillId].effect))
+        local phaseRange = ((phase.vfx and phase.vfx.range) or skillDef.range) * IMPACT_RANGE_SCALE
+        local phaseWidth = ((phase.vfx and phase.vfx.width) or skillDef.width) * IMPACT_WIDTH_SCALE
+
         VFXService.emit(dependencies.Runtime.EffectEvent, effectName, {
             userId = player.UserId,
             skillId = skillId,
             marker = phase.marker or 'Phase',
             origin = currentOrigin,
             direction = currentLook,
-            range = (phase.vfx and phase.vfx.range) or skillDef.range,
-            width = (phase.vfx and phase.vfx.width) or skillDef.width,
+            range = phaseRange,
+            width = phaseWidth,
             timeline = true,
             vfx = phase.vfx,
         })

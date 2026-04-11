@@ -16,6 +16,10 @@ local dependencies = nil
 local DASH_TEXTURE = 'rbxassetid://7216979807'
 local ATTACK_SOUND_ID = 'rbxassetid://134072730260352'
 local MARKETPLACE_TEMPLATE_FOLDER = 'MarketplaceVfx7564537285'
+local GLOBAL_IMPACT_SCALE = 1.35
+local HIT_CAMERA_RADIUS = 36
+local makeEffectPart: ((Color3, Vector3, CFrame, Enum.PartType?, number) -> Part)?
+local tweenAndCleanup: ((Instance, TweenInfo, any) -> ())?
 
 local function getSkinBurstPalette(templateId: string?): (Color3, Color3)
     if templateId == 'DekuCharacterTemplate' then
@@ -133,6 +137,162 @@ local function forEachClonePart(instance: Instance, callback)
             callback(descendant)
         end
     end
+end
+
+local function scaleSequence(sequence: NumberSequence, factor: number): NumberSequence
+    local keypoints = {}
+    for _, keypoint in ipairs(sequence.Keypoints) do
+        table.insert(keypoints, NumberSequenceKeypoint.new(keypoint.Time, keypoint.Value * factor, keypoint.Envelope))
+    end
+    return NumberSequence.new(keypoints)
+end
+
+local function scaleCloneVisuals(instance: Instance, factor: number)
+    if math.abs(factor - 1) <= 0.001 then
+        return
+    end
+
+    forEachClonePart(instance, function(part: BasePart)
+        part.Size = part.Size * factor
+    end)
+
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA('ParticleEmitter') then
+            descendant.Size = scaleSequence(descendant.Size, factor)
+            descendant.Speed = NumberRange.new(descendant.Speed.Min * 1.1, descendant.Speed.Max * 1.15)
+            descendant.Brightness = descendant.Brightness + 1
+        elseif descendant:IsA('Beam') then
+            descendant.Width0 = descendant.Width0 * factor
+            descendant.Width1 = descendant.Width1 * factor
+            descendant.Brightness = descendant.Brightness + 1
+        elseif descendant:IsA('Trail') then
+            descendant.WidthScale = scaleSequence(descendant.WidthScale, factor)
+            descendant.Lifetime = descendant.Lifetime * 1.1
+        end
+    end
+end
+
+local function playCameraPunch(position: Vector3, intensity: number, duration: number)
+    local camera = Workspace.CurrentCamera
+    if not camera then
+        return
+    end
+
+    local cameraDistance = (camera.CFrame.Position - position).Magnitude
+    if cameraDistance > HIT_CAMERA_RADIUS then
+        return
+    end
+
+    local shakeScale = intensity * (1 - (cameraDistance / HIT_CAMERA_RADIUS))
+    if shakeScale <= 0 then
+        return
+    end
+
+    local startCFrame = camera.CFrame
+    local startedAt = os.clock()
+    local connection = nil
+    connection = RunService.Heartbeat:Connect(function()
+        if not camera.Parent then
+            if connection then
+                connection:Disconnect()
+            end
+            return
+        end
+
+        local alpha = math.clamp((os.clock() - startedAt) / math.max(duration, 0.01), 0, 1)
+        local decay = 1 - alpha
+        local noise = Vector3.new(
+            (math.random() * 2 - 1) * 0.17 * shakeScale * decay,
+            (math.random() * 2 - 1) * 0.14 * shakeScale * decay,
+            (math.random() * 2 - 1) * 0.09 * shakeScale * decay
+        )
+        camera.CFrame = startCFrame * CFrame.new(noise)
+
+        if alpha >= 1 then
+            camera.CFrame = startCFrame
+            if connection then
+                connection:Disconnect()
+            end
+        end
+    end)
+end
+
+local function spawnPowText(position: Vector3, color: Color3, text: string, scale: number)
+    local anchor = Instance.new('Part')
+    anchor.Anchored = true
+    anchor.CanCollide = false
+    anchor.CanQuery = false
+    anchor.CanTouch = false
+    anchor.Transparency = 1
+    anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+    anchor.CFrame = CFrame.new(position)
+    anchor.Parent = getFxParent()
+
+    local billboard = Instance.new('BillboardGui')
+    billboard.Size = UDim2.fromOffset(math.floor(100 * scale), math.floor(54 * scale))
+    billboard.StudsOffset = Vector3.new(0, 1.7 + (0.45 * scale), 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = anchor
+
+    local label = Instance.new('TextLabel')
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.Arcade
+    label.TextScaled = true
+    label.Text = text
+    label.TextColor3 = color
+    label.TextStrokeTransparency = 0
+    label.TextStrokeColor3 = Color3.fromRGB(18, 23, 33)
+    label.Rotation = math.random(-14, 14)
+    label.Parent = billboard
+
+    local riseTween = TweenService:Create(billboard, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        StudsOffset = billboard.StudsOffset + Vector3.new(0, 1.7, 0),
+    })
+    local fadeTween = TweenService:Create(label, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0.08), {
+        TextTransparency = 1,
+        TextStrokeTransparency = 1,
+    })
+    riseTween:Play()
+    fadeTween:Play()
+    Debris:AddItem(anchor, 0.35)
+end
+
+local function playImpactPunch(position: Vector3, color: Color3, intensity: number)
+    local scale = GLOBAL_IMPACT_SCALE * intensity
+    local createPart = makeEffectPart
+    local tweenInstance = tweenAndCleanup
+    if not createPart or not tweenInstance then
+        return
+    end
+
+    local core = createPart(
+        color:Lerp(Color3.new(1, 1, 1), 0.42),
+        Vector3.new(2.2, 2.2, 2.2) * scale,
+        CFrame.new(position + Vector3.new(0, 0.5, 0)),
+        Enum.PartType.Ball,
+        0.1
+    )
+    tweenInstance(core, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = Vector3.new(6.8, 6.8, 6.8) * scale,
+        Transparency = 1,
+    })
+
+    local ring = createPart(
+        color,
+        Vector3.new(0.28, 7.2, 7.2) * scale,
+        CFrame.new(position + Vector3.new(0, 0.15, 0)) * CFrame.Angles(math.rad(90), 0, 0),
+        Enum.PartType.Cylinder,
+        0.08
+    )
+    tweenInstance(ring, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        Size = Vector3.new(0.28, 20, 20) * scale,
+        Transparency = 1,
+    })
+
+    local powText = if math.random() < 0.52 then 'POW!' else 'HIT!'
+    spawnPowText(position + Vector3.new(0, 1.2, 0), color, powText, 1 + (intensity * 0.2))
+    playCameraPunch(position, 1.4 * intensity, 0.09)
 end
 
 local function emitCloneParticles(instance: Instance, burstCount: number?)
@@ -313,13 +473,13 @@ local function playSkinBurstEffect(payload)
     Debris:AddItem(burstAnchor, 0.5)
 end
 
-local function tweenAndCleanup(instance: Instance, tweenInfo: TweenInfo, goal)
+function tweenAndCleanup(instance: Instance, tweenInfo: TweenInfo, goal)
     local tween = TweenService:Create(instance, tweenInfo, goal)
     tween:Play()
     Debris:AddItem(instance, tweenInfo.Time + 0.1)
 end
 
-local function makeEffectPart(color: Color3, size: Vector3, cframe: CFrame, shape: Enum.PartType?, transparency: number)
+function makeEffectPart(color: Color3, size: Vector3, cframe: CFrame, shape: Enum.PartType?, transparency: number)
     local part = Instance.new('Part')
     part.Anchored = true
     part.CanCollide = false
@@ -435,17 +595,27 @@ local function playSlashEffect(payload, color: Color3, width: number)
     local direction = payload.direction or Vector3.new(0, 0, -1)
     local origin = payload.origin or Vector3.zero
     local range = payload.range or 10
+    local look = Vector3.new(direction.X, 0, direction.Z)
+    if look.Magnitude <= 0.001 then
+        look = Vector3.new(0, 0, -1)
+    else
+        look = look.Unit
+    end
     local effect = makeEffectPart(
         color,
-        Vector3.new(width, 0.6, range),
+        Vector3.new(width * GLOBAL_IMPACT_SCALE, 0.7, range * 1.08),
         CFrame.lookAt(origin + Vector3.new(0, 2, 0), origin + Vector3.new(direction.X, 2, direction.Z)) * CFrame.new(0, 0, -range * 0.5),
         nil,
-        0.22
+        0.15
     )
     tweenAndCleanup(effect, TweenInfo.new(0.2), {
-        Size = Vector3.new(width * 1.1, 0.2, range * 1.05),
+        Size = Vector3.new(width * 1.85, 0.2, range * 1.25),
         Transparency = 1,
     })
+
+    task.delay(0.06, function()
+        playImpactPunch(origin + look * (range * 0.72), color, 0.8)
+    end)
 end
 
 local function getPlanarLookAndRight(direction: Vector3): (Vector3, Vector3)
@@ -479,6 +649,7 @@ local function playArcFlareEffect(payload)
 
     setCloneColor(clone, Color3.fromRGB(119, 236, 255))
     setCloneTransparency(clone, 0.1)
+    scaleCloneVisuals(clone, 1.28)
     emitCloneParticles(clone, 32)
 
     local baseHeight = 2.4
@@ -491,6 +662,10 @@ local function playArcFlareEffect(payload)
         local rotation = CFrame.Angles(0, math.rad(180 * alpha * spin), math.rad((1 - alpha) * 20 * side))
         placeClone(clone, CFrame.lookAt(position, position + look) * rotation)
         setCloneTransparency(clone, 0.08 + alpha * 0.92)
+    end)
+
+    task.delay(duration * 0.85, function()
+        playImpactPunch(origin + look * (range * 0.85), Color3.fromRGB(119, 236, 255), 1.05)
     end)
 end
 
@@ -511,6 +686,7 @@ local function playNovaStrikeEffect(payload)
 
     setCloneColor(clone, Color3.fromRGB(166, 204, 255))
     setCloneTransparency(clone, 0.05)
+    scaleCloneVisuals(clone, 1.22)
     emitCloneParticles(clone, 36)
 
     animateCloneMotion(clone, duration, function(alpha)
@@ -521,10 +697,11 @@ local function playNovaStrikeEffect(payload)
     end)
 
     task.delay(duration * 0.9, function()
+        local hitPosition = origin + Vector3.new(0, 2.1, 0) + look * range
         local burst = makeEffectPart(
             Color3.fromRGB(190, 222, 255),
             Vector3.new(2.2, 2.2, 2.2),
-            CFrame.new(origin + Vector3.new(0, 2.1, 0) + look * range),
+            CFrame.new(hitPosition),
             Enum.PartType.Ball,
             0.12
         )
@@ -532,6 +709,7 @@ local function playNovaStrikeEffect(payload)
             Size = Vector3.new(6.4, 6.4, 6.4),
             Transparency = 1,
         })
+        playImpactPunch(hitPosition, Color3.fromRGB(166, 204, 255), 1.15)
     end)
 end
 
@@ -549,6 +727,7 @@ local function playVortexSpinEffect(payload)
 
     setCloneColor(clone, Color3.fromRGB(194, 132, 255))
     setCloneTransparency(clone, 0.15)
+    scaleCloneVisuals(clone, 1.24)
     emitCloneParticles(clone, 42)
 
     animateCloneMotion(clone, duration, function(alpha)
@@ -557,6 +736,10 @@ local function playVortexSpinEffect(payload)
         local position = origin + Vector3.new(math.cos(theta) * orbitRadius, 2 + math.sin(theta * 1.4) * 0.4, math.sin(theta) * orbitRadius)
         placeClone(clone, CFrame.lookAt(position, origin + Vector3.new(0, 2, 0)) * CFrame.Angles(0, theta * 2.1, 0))
         setCloneTransparency(clone, 0.12 + alpha * 0.86)
+    end)
+
+    task.delay(duration * 0.9, function()
+        playImpactPunch(origin + Vector3.new(0, 1.6, 0), Color3.fromRGB(194, 132, 255), 1.2)
     end)
 end
 
@@ -577,6 +760,7 @@ local function playCometDropEffect(payload)
 
     setCloneColor(clone, Color3.fromRGB(255, 176, 118))
     setCloneTransparency(clone, 0.1)
+    scaleCloneVisuals(clone, 1.33)
     emitCloneParticles(clone, 50)
 
     local impactPoint = origin + look * math.max(range * 0.2, 0)
@@ -599,6 +783,7 @@ local function playCometDropEffect(payload)
             Size = Vector3.new(0.35, 24, 24),
             Transparency = 1,
         })
+        playImpactPunch(impactPoint, Color3.fromRGB(255, 176, 118), 1.4)
     end)
 end
 
@@ -620,6 +805,7 @@ local function playRazorOrbitEffect(payload)
 
     setCloneColor(clone, Color3.fromRGB(205, 246, 255))
     setCloneTransparency(clone, 0.12)
+    scaleCloneVisuals(clone, 1.25)
     emitCloneParticles(clone, 34)
 
     animateCloneMotion(clone, duration, function(alpha)
@@ -632,6 +818,10 @@ local function playRazorOrbitEffect(payload)
 
         placeClone(clone, CFrame.lookAt(orbitPosition, orbitPosition + look) * CFrame.Angles(0, theta * 2, math.rad(math.sin(theta) * 24)))
         setCloneTransparency(clone, 0.08 + alpha * 0.9)
+    end)
+
+    task.delay(duration * 0.9, function()
+        playImpactPunch(origin + look * (range * 0.82), Color3.fromRGB(205, 246, 255), 1.08)
     end)
 end
 
@@ -677,22 +867,15 @@ local function playEnemyAttackEffect(payload)
 end
 
 local function playEnemyHitEffect(payload)
-    local part = makeEffectPart(
-        payload.color or (payload.isBoss and Color3.fromRGB(255, 84, 120) or Color3.fromRGB(255, 255, 255)),
-        Vector3.new(2.8, 2.8, 2.8),
-        CFrame.new(payload.position or Vector3.zero),
-        Enum.PartType.Ball,
-        0.15
-    )
-    tweenAndCleanup(part, TweenInfo.new(0.16), {
-        Size = Vector3.new(5.2, 5.2, 5.2),
-        Transparency = 1,
-    })
+    local color = payload.color or (payload.isBoss and Color3.fromRGB(255, 84, 120) or Color3.fromRGB(255, 255, 255))
+    local intensity = if payload.isBoss then 1.25 else 1
+    playImpactPunch(payload.position or Vector3.zero, color, intensity)
 end
 
 local function playEnemyDeathEffect(payload)
+    local deathColor = payload.color or (payload.isBoss and Color3.fromRGB(255, 92, 128) or Color3.fromRGB(255, 208, 118))
     local ring = makeEffectPart(
-        payload.color or (payload.isBoss and Color3.fromRGB(255, 92, 128) or Color3.fromRGB(255, 208, 118)),
+        deathColor,
         Vector3.new(0.5, 4, 4),
         CFrame.new((payload.position or Vector3.zero) + Vector3.new(0, 0.2, 0)) * CFrame.Angles(math.rad(90), 0, 0),
         Enum.PartType.Cylinder,
@@ -702,6 +885,7 @@ local function playEnemyDeathEffect(payload)
         Size = Vector3.new(0.5, 14, 14),
         Transparency = 1,
     })
+    playImpactPunch(payload.position or Vector3.zero, deathColor, payload.isBoss and 1.75 or 1.25)
     playWorldSound(ATTACK_SOUND_ID, payload.position or Vector3.zero, payload.isBoss and 0.75 or 0.42, payload.isBoss and 0.58 or 1.15, 1.8)
 end
 
