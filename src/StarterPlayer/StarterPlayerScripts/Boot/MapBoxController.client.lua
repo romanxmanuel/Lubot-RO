@@ -15,6 +15,16 @@ local legacyZoneFolderName = '_Deleted_TonyController'
 local mapsFolderName = 'Maps'
 local mapBoxName = 'MapBox'
 local zoneVisualOverrideAttributeName = 'ZoneVisualOverrideUntil'
+local lubidriumTuneAttributeName = 'LubotLubidriumVisualTuned'
+
+local originalPointBrightnessAttribute = 'LubotOriginalPointBrightness'
+local originalPointRangeAttribute = 'LubotOriginalPointRange'
+local originalParticleLightEmissionAttribute = 'LubotOriginalParticleLightEmission'
+local originalParticleBrightnessAttribute = 'LubotOriginalParticleBrightness'
+local originalParticleRateAttribute = 'LubotOriginalParticleRate'
+local originalPartTransparencyAttribute = 'LubotOriginalPartTransparency'
+local originalPartColorAttribute = 'LubotOriginalPartColor'
+local originalPartReflectanceAttribute = 'LubotOriginalPartReflectance'
 
 local SUPPORTED_ZONE_EFFECTS = {
     Atmosphere = {
@@ -312,6 +322,188 @@ local function parseLightingStyleValue(value: any, fallback: Enum.LightingStyle)
     return fallback
 end
 
+local function isLubidriumZoneKey(zoneKey: string): boolean
+    local lowered = string.lower(zoneKey)
+    return string.find(lowered, 'lubidrium', 1, true) ~= nil
+        or string.find(lowered, 'ludibrium', 1, true) ~= nil
+end
+
+local function raisePartTransparency(part: BasePart, amount: number, maxTransparency: number)
+    local originalTransparency = part:GetAttribute(originalPartTransparencyAttribute)
+    if typeof(originalTransparency) ~= 'number' then
+        originalTransparency = part.Transparency
+        part:SetAttribute(originalPartTransparencyAttribute, originalTransparency)
+    end
+
+    part.Transparency = math.clamp((originalTransparency :: number) + amount, 0, maxTransparency)
+end
+
+local function tuneLubidriumMapVisuals()
+    local mapsFolder = Workspace:FindFirstChild(mapsFolderName)
+    if not mapsFolder then
+        return
+    end
+
+    local lubidriumFolder = mapsFolder:FindFirstChild('Lubidrium')
+    if not lubidriumFolder then
+        return
+    end
+
+    local mapFolder = lubidriumFolder:FindFirstChild('Map')
+    if not mapFolder then
+        return
+    end
+
+    local zoneModel = mapFolder:FindFirstChild('LudibriumCosmicZone')
+    if not zoneModel then
+        zoneModel = mapFolder:FindFirstChild('LubidriumCosmicZone')
+    end
+    if not zoneModel then
+        return
+    end
+
+    if zoneModel:GetAttribute(lubidriumTuneAttributeName) == true then
+        return
+    end
+
+    for _, descendant in ipairs(zoneModel:GetDescendants()) do
+        if descendant:IsA('PointLight') then
+            local originalBrightness = descendant:GetAttribute(originalPointBrightnessAttribute)
+            if typeof(originalBrightness) ~= 'number' then
+                originalBrightness = descendant.Brightness
+                descendant:SetAttribute(originalPointBrightnessAttribute, originalBrightness)
+            end
+
+            local originalRange = descendant:GetAttribute(originalPointRangeAttribute)
+            if typeof(originalRange) ~= 'number' then
+                originalRange = descendant.Range
+                descendant:SetAttribute(originalPointRangeAttribute, originalRange)
+            end
+
+            descendant.Brightness = math.max(0.03, (originalBrightness :: number) * 0.24)
+            descendant.Range = math.max(3, (originalRange :: number) * 0.45)
+            descendant.Shadows = false
+        elseif descendant:IsA('ParticleEmitter') then
+            local originalLightEmission = descendant:GetAttribute(originalParticleLightEmissionAttribute)
+            if typeof(originalLightEmission) ~= 'number' then
+                originalLightEmission = descendant.LightEmission
+                descendant:SetAttribute(originalParticleLightEmissionAttribute, originalLightEmission)
+            end
+
+            local originalBrightness = descendant:GetAttribute(originalParticleBrightnessAttribute)
+            if typeof(originalBrightness) ~= 'number' then
+                originalBrightness = descendant.Brightness
+                descendant:SetAttribute(originalParticleBrightnessAttribute, originalBrightness)
+            end
+
+            local originalRate = descendant:GetAttribute(originalParticleRateAttribute)
+            if typeof(originalRate) ~= 'number' then
+                originalRate = descendant.Rate
+                descendant:SetAttribute(originalParticleRateAttribute, originalRate)
+            end
+
+            descendant.LightEmission = math.max(0, (originalLightEmission :: number) * 0.1)
+            descendant.Brightness = math.max(0, (originalBrightness :: number) * 0.22)
+            descendant.Rate = math.max(0, (originalRate :: number) * 0.4)
+        elseif descendant:IsA('BasePart') and descendant.Material == Enum.Material.Neon then
+            local originalColor = descendant:GetAttribute(originalPartColorAttribute)
+            if typeof(originalColor) ~= 'Color3' then
+                originalColor = descendant.Color
+                descendant:SetAttribute(originalPartColorAttribute, originalColor)
+            end
+
+            local originalReflectance = descendant:GetAttribute(originalPartReflectanceAttribute)
+            if typeof(originalReflectance) ~= 'number' then
+                originalReflectance = descendant.Reflectance
+                descendant:SetAttribute(originalPartReflectanceAttribute, originalReflectance)
+            end
+
+            local hue, saturation, value = (originalColor :: Color3):ToHSV()
+            descendant.Color = Color3.fromHSV(hue, math.clamp(saturation * 0.85, 0.1, 1), math.clamp(value * 0.62, 0, 0.56))
+            descendant.Reflectance = math.max(0, (originalReflectance :: number) * 0.2)
+            raisePartTransparency(descendant, 0.35, 0.9)
+        end
+    end
+
+    zoneModel:SetAttribute(lubidriumTuneAttributeName, true)
+end
+
+local function getLubidriumZoneModel(): Model?
+    local mapsFolder = Workspace:FindFirstChild(mapsFolderName)
+    if not mapsFolder then
+        return nil
+    end
+
+    local lubidriumFolder = mapsFolder:FindFirstChild('Lubidrium')
+    if not lubidriumFolder then
+        return nil
+    end
+
+    local mapFolder = lubidriumFolder:FindFirstChild('Map')
+    if not mapFolder then
+        return nil
+    end
+
+    local zoneModel = mapFolder:FindFirstChild('LudibriumCosmicZone')
+    if zoneModel and zoneModel:IsA('Model') then
+        return zoneModel
+    end
+
+    zoneModel = mapFolder:FindFirstChild('LubidriumCosmicZone')
+    if zoneModel and zoneModel:IsA('Model') then
+        return zoneModel
+    end
+
+    return nil
+end
+
+local function isInsideModelBounds(position: Vector3, model: Model): boolean
+    local boundsCFrame, boundsSize = model:GetBoundingBox()
+    local localPosition = boundsCFrame:PointToObjectSpace(position)
+    local halfSize = boundsSize * 0.5
+
+    return math.abs(localPosition.X) <= halfSize.X
+        and math.abs(localPosition.Y) <= halfSize.Y
+        and math.abs(localPosition.Z) <= halfSize.Z
+end
+
+local function applyLubidriumLightingPass(zoneKey: string)
+    if not isLubidriumZoneKey(zoneKey) then
+        return
+    end
+
+    Lighting.ExposureCompensation = math.min(Lighting.ExposureCompensation, -0.55)
+    Lighting.Brightness = math.min(Lighting.Brightness, 1.25)
+    Lighting.EnvironmentSpecularScale = math.min(Lighting.EnvironmentSpecularScale, 0.18)
+
+    local bloom = findLightingEffectByClass('BloomEffect')
+    if bloom and bloom:IsA('BloomEffect') then
+        bloom.Intensity = math.min(bloom.Intensity, 0.015)
+        bloom.Size = math.min(bloom.Size, 10)
+        bloom.Threshold = math.max(bloom.Threshold, 3)
+    end
+
+    local sunRays = findLightingEffectByClass('SunRaysEffect')
+    if sunRays and sunRays:IsA('SunRaysEffect') then
+        sunRays.Intensity = math.min(sunRays.Intensity, 0.005)
+        sunRays.Spread = math.min(sunRays.Spread, 0.5)
+    end
+
+    local colorCorrection = findLightingEffectByClass('ColorCorrectionEffect')
+    if colorCorrection and colorCorrection:IsA('ColorCorrectionEffect') then
+        colorCorrection.Brightness = math.min(colorCorrection.Brightness, -0.11)
+        colorCorrection.Contrast = math.min(colorCorrection.Contrast, 0.12)
+        colorCorrection.Saturation = math.min(colorCorrection.Saturation, -0.22)
+    end
+
+    local atmosphere = findLightingEffectByClass('Atmosphere')
+    if atmosphere and atmosphere:IsA('Atmosphere') then
+        atmosphere.Density = math.min(atmosphere.Density, 0.14)
+        atmosphere.Glare = math.min(atmosphere.Glare, 0)
+        atmosphere.Haze = math.min(atmosphere.Haze, 0.35)
+    end
+end
+
 local function resolveFallbackProfile(zoneId: string): ZoneProfile?
     local zoneConfig = ZoneAudioConfig.zoneTracks[zoneId]
     if not zoneConfig then
@@ -545,6 +737,7 @@ if zoneSky then
 end
 initializeBaseZoneEffects()
 silenceZoneAttachedSounds()
+tuneLubidriumMapVisuals()
 local currentZoneKey = nil
 local nextRefreshAt = 0
 
@@ -585,6 +778,7 @@ local function applyZoneProfile(zoneKey: string, zoneProfile: ZoneProfile?)
     Lighting.GeographicLatitude = zoneProfile.geographicLatitude
     Lighting.ShadowSoftness = zoneProfile.shadowSoftness
     applyZoneSky(zoneProfile)
+    applyLubidriumLightingPass(zoneKey)
 
     if not zoneProfile.musicId or zoneProfile.musicId == '' then
         zoneSound:Stop()
@@ -618,10 +812,13 @@ RunService.RenderStepped:Connect(function()
     end
     nextRefreshAt = now + 0.25
 
+    tuneLubidriumMapVisuals()
     local rootPart = getRootPart()
     if not rootPart then
         return
     end
+    local lubidriumZoneModel = getLubidriumZoneModel()
+    local inLubidriumBounds = lubidriumZoneModel ~= nil and isInsideModelBounds(rootPart.Position, lubidriumZoneModel)
 
     silenceZoneAttachedSounds()
 
@@ -634,10 +831,16 @@ RunService.RenderStepped:Connect(function()
         local zoneName = zoneVolume:GetAttribute('ZoneId') or zoneVolume.Name
         syncZoneEffects(zoneVolume)
         applyZoneProfile('volume:' .. tostring(zoneName), resolveZoneVolumeProfile(zoneVolume))
+        if inLubidriumBounds then
+            applyLubidriumLightingPass('map:lubidrium')
+        end
         return
     end
 
     local zoneId = resolveZoneId(rootPart.Position)
     syncZoneEffects(nil)
     applyZoneProfile('config:' .. zoneId, resolveFallbackProfile(zoneId))
+    if inLubidriumBounds then
+        applyLubidriumLightingPass('map:lubidrium')
+    end
 end)
