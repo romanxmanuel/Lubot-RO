@@ -683,6 +683,45 @@ local function getPlanarLookAndRight(direction: Vector3): (Vector3, Vector3)
     return look, right
 end
 
+local function playPowerSlashEffect(payload)
+    local direction = payload.direction or Vector3.new(0, 0, -1)
+    local origin = payload.origin or Vector3.zero
+    playSkillBite(payload, origin)
+    local vfx = payload.vfx or {}
+    local duration = tonumber(vfx.duration) or 0.26
+    local range = tonumber(vfx.range) or payload.range or 18
+    local side = tonumber(vfx.side) or 1
+    local arc = tonumber(vfx.arc) or 3.6
+    local spin = tonumber(vfx.spin) or 1.1
+    local look, right = getPlanarLookAndRight(direction)
+
+    local clone = cloneMarketplaceTemplate('PowerSlash')
+    if not clone then
+        playSlashEffect(payload, Color3.fromRGB(106, 228, 255), payload.width or 8)
+        return
+    end
+
+    setCloneTransparency(clone, 0.08)
+    scaleCloneVisuals(clone, 1.35)
+    emitCloneParticles(clone, 44)
+
+    local baseHeight = 2.3
+    animateCloneMotion(clone, duration, function(alpha)
+        local wave = math.sin(alpha * math.pi)
+        local forward = look * (range * alpha)
+        local lateral = right * (wave * arc * side)
+        local vertical = Vector3.new(0, wave * 0.45, 0)
+        local position = origin + Vector3.new(0, baseHeight, 0) + forward + lateral + vertical
+        local rotation = CFrame.Angles(0, math.rad(540 * alpha * spin), math.rad((1 - alpha) * 18 * side))
+        placeClone(clone, CFrame.lookAt(position, position + look) * rotation)
+        setCloneTransparency(clone, 0.06 + alpha * 0.9)
+    end)
+
+    task.delay(duration * 0.82, function()
+        playImpactPunch(origin + look * (range * 0.82), Color3.fromRGB(106, 228, 255), 1.2)
+    end)
+end
+
 local function playArcFlareEffect(payload)
     local direction = payload.direction or Vector3.new(0, 0, -1)
     local origin = payload.origin or Vector3.zero
@@ -739,7 +778,6 @@ local function playNovaStrikeEffect(payload)
         return
     end
 
-    setCloneColor(clone, Color3.fromRGB(166, 204, 255))
     setCloneTransparency(clone, 0.05)
     scaleCloneVisuals(clone, 1.22)
     emitCloneParticles(clone, 36)
@@ -1095,7 +1133,7 @@ function EffectsController.start()
         elseif effectName == MMONet.Effects.Slash then
             playSlashEffect(payload, Color3.fromRGB(210, 240, 255), 4)
         elseif effectName == MMONet.Effects.PowerSlash then
-            playSlashEffect(payload, Color3.fromRGB(106, 228, 255), payload.width or 8)
+            playPowerSlashEffect(payload)
         elseif effectName == MMONet.Effects.ArcFlare then
             playArcFlareEffect(payload)
         elseif effectName == MMONet.Effects.NovaStrike then

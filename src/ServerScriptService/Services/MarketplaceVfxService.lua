@@ -7,15 +7,46 @@ local MarketplaceVfxService = {
     Name = 'MarketplaceVfxService',
 }
 
-local VFX_ASSET_ID = 7564537285
 local TEMPLATE_FOLDER_NAME = 'MarketplaceVfx7564537285'
+local SOURCE_FOLDER_PREFIX = 'MarketplaceAsset_'
 
-local TEMPLATE_SOURCES = {
-    ArcFlare = { 'FancySlash', 'FancySlashLight', 'FancySlashDark' },
-    NovaStrike = { 'FancyBall', 'GravityBallShockwave', 'CircleShockwave' },
-    VortexSpin = { 'GlitchWind', 'CircleShockwave', 'DecalShockwave' },
-    CometDrop = { 'FireBall', 'FireBallB', 'ExplosionB' },
-    RazorOrbit = { 'DecalShockwave', 'CircleShockwave', 'FancySphere' },
+local ASSET_BUNDLES = {
+    basePack = {
+        assetId = 7564537285,
+    },
+    powerSlashPack = {
+        assetId = 121170725728238,
+    },
+    beamPack = {
+        assetId = 139055633559547,
+    },
+}
+
+local TEMPLATE_SPECS = {
+    PowerSlash = {
+        bundle = 'powerSlashPack',
+        sourceNames = { 'Model', 'VFX', 'crash3', 'crash4' },
+    },
+    ArcFlare = {
+        bundle = 'basePack',
+        sourceNames = { 'FancySlash', 'FancySlashLight', 'FancySlashDark' },
+    },
+    NovaStrike = {
+        bundle = 'beamPack',
+        sourceNames = { 'Beam', 'FF', 'Part' },
+    },
+    VortexSpin = {
+        bundle = 'basePack',
+        sourceNames = { 'GlitchWind', 'CircleShockwave', 'DecalShockwave' },
+    },
+    CometDrop = {
+        bundle = 'basePack',
+        sourceNames = { 'FireBall', 'FireBallB', 'ExplosionB' },
+    },
+    RazorOrbit = {
+        bundle = 'basePack',
+        sourceNames = { 'DecalShockwave', 'CircleShockwave', 'FancySphere' },
+    },
 }
 
 local function ensureFolder(parent: Instance, name: string): Folder
@@ -102,17 +133,51 @@ local function findTemplateCandidate(pool: { Instance }, names: { string }): Ins
     return nil
 end
 
-local function loadAssetContainer()
+local function clearChildren(parent: Instance)
+    for _, child in ipairs(parent:GetChildren()) do
+        child:Destroy()
+    end
+end
+
+local function loadAssetContainer(assetId: number)
     local ok, loaded = pcall(function()
-        return InsertService:LoadAsset(VFX_ASSET_ID)
+        return InsertService:LoadAsset(assetId)
     end)
 
     if not ok then
-        warn(string.format('[MarketplaceVfxService] Failed to load VFX asset %d: %s', VFX_ASSET_ID, tostring(loaded)))
+        warn(string.format('[MarketplaceVfxService] Failed to load VFX asset %d: %s', assetId, tostring(loaded)))
         return nil
     end
 
     return loaded
+end
+
+local function buildSourceBundle(fxRoot: Folder, bundleName: string, assetId: number)
+    local sourceFolderName = string.format('%s%d', SOURCE_FOLDER_PREFIX, assetId)
+    local sourceFolder = ensureFolder(fxRoot, sourceFolderName)
+    local loaded = loadAssetContainer(assetId)
+    if loaded then
+        clearChildren(sourceFolder)
+        for _, child in ipairs(loaded:GetChildren()) do
+            child:Clone().Parent = sourceFolder
+        end
+        loaded:Destroy()
+        sourceFolder:SetAttribute('CachedFromInsertService', true)
+    elseif #sourceFolder:GetDescendants() > 0 then
+        warn(string.format('[MarketplaceVfxService] Using cached source folder for asset %d (InsertService unavailable).', assetId))
+    else
+        warn(string.format('[MarketplaceVfxService] No source data available for asset %d.', assetId))
+    end
+
+    sourceFolder:SetAttribute('MarketplaceAssetId', assetId)
+    sourceFolder:SetAttribute('BundleName', bundleName)
+
+    return {
+        bundleName = bundleName,
+        assetId = assetId,
+        sourceFolder = sourceFolder,
+        sourcePool = collectSourcePool(sourceFolder),
+    }
 end
 
 local function buildTemplateFolder()
@@ -123,19 +188,17 @@ local function buildTemplateFolder()
     end
 
     local templateFolder = ensureFolder(fxRoot, TEMPLATE_FOLDER_NAME)
-    for _, child in ipairs(templateFolder:GetChildren()) do
-        child:Destroy()
-    end
+    clearChildren(templateFolder)
 
-    local loaded = loadAssetContainer()
-    local sourcePool = {}
-    if loaded then
-        sourcePool = collectSourcePool(loaded)
+    local bundles = {}
+    for bundleName, bundleDef in pairs(ASSET_BUNDLES) do
+        bundles[bundleName] = buildSourceBundle(fxRoot, bundleName, bundleDef.assetId)
     end
 
     local createdCount = 0
-    for templateName, sourceNames in pairs(TEMPLATE_SOURCES) do
-        local candidate = findTemplateCandidate(sourcePool, sourceNames)
+    for templateName, templateSpec in pairs(TEMPLATE_SPECS) do
+        local bundle = bundles[templateSpec.bundle]
+        local candidate = if bundle then findTemplateCandidate(bundle.sourcePool, templateSpec.sourceNames) else nil
         local clone: Instance
         if candidate then
             clone = candidate:Clone()
@@ -147,15 +210,17 @@ local function buildTemplateFolder()
         clone.Name = templateName
         stripScripts(clone)
         normalizeTemplate(clone)
+        if bundle then
+            clone:SetAttribute('SourceAssetId', bundle.assetId)
+            clone:SetAttribute('SourceBundle', bundle.bundleName)
+        end
         clone.Parent = templateFolder
         createdCount += 1
     end
 
-    if loaded then
-        loaded:Destroy()
-    end
-
-    templateFolder:SetAttribute('MarketplaceAssetId', VFX_ASSET_ID)
+    templateFolder:SetAttribute('MarketplaceAssetId', ASSET_BUNDLES.basePack.assetId)
+    templateFolder:SetAttribute('PowerSlashAssetId', ASSET_BUNDLES.powerSlashPack.assetId)
+    templateFolder:SetAttribute('BeamAssetId', ASSET_BUNDLES.beamPack.assetId)
     templateFolder:SetAttribute('TemplateCount', createdCount)
 end
 
