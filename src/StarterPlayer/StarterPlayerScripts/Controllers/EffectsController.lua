@@ -28,6 +28,33 @@ local function getSkinBurstPalette(templateId: string?): (Color3, Color3)
     return Color3.fromRGB(180, 228, 255), Color3.fromRGB(244, 250, 255)
 end
 
+local SKILL_SOUND_PROFILE = {
+    power_slash = {
+        Slash1 = { id = 'http://www.roblox.com/asset/?id=12222216', volume = 0.75, speed = 1.02 },
+        Recover = { id = 'http://www.roblox.com/asset/?id=12222225', volume = 0.28, speed = 1.1 },
+    },
+    arc_flare = {
+        Slash1 = { id = 'http://www.roblox.com/asset/?id=12222095', volume = 0.62, speed = 1.08 },
+        Slash2 = { id = 'http://www.roblox.com/asset/?id=12222208', volume = 0.67, speed = 1.18 },
+    },
+    nova_strike = {
+        Dash = { id = 'http://www.roblox.com/asset/?id=12222095', volume = 0.55, speed = 1.32 },
+        Slash1 = { id = 'rbxasset://sounds//paintball.wav', volume = 0.7, speed = 1.26 },
+    },
+    vortex_spin = {
+        Slash1 = { id = 'http://www.roblox.com/asset/?id=12222095', volume = 0.6, speed = 0.95 },
+        Slash2 = { id = 'rbxasset://sounds//Rubber band sling shot.wav', volume = 0.62, speed = 0.84 },
+    },
+    comet_drop = {
+        Slash1 = { id = 'http://www.roblox.com/asset/?id=12222095', volume = 0.66, speed = 0.82 },
+        Slash2 = { id = 'rbxasset://sounds/collide.wav', volume = 0.94, speed = 0.58 },
+    },
+    razor_orbit = {
+        Slash1 = { id = 'http://www.roblox.com/asset/?id=12222225', volume = 0.54, speed = 1.16 },
+        Slash2 = { id = 'http://www.roblox.com/asset/?id=12222216', volume = 0.7, speed = 1.2 },
+    },
+}
+
 local function getDekuFxFolder(): Folder?
     local gameParts = ReplicatedStorage:FindFirstChild('GameParts')
     local fxRoot = gameParts and gameParts:FindFirstChild('FX')
@@ -355,6 +382,31 @@ local function playWorldSound(soundId: string, position: Vector3, volume: number
     Debris:AddItem(anchor, lifetime)
 end
 
+local function resolveSkillSound(payload)
+    local skillId = if type(payload) == 'table' and type(payload.skillId) == 'string' then payload.skillId else nil
+    if not skillId then
+        return nil
+    end
+
+    local marker = if type(payload.marker) == 'string' then payload.marker else 'Slash1'
+    local profile = SKILL_SOUND_PROFILE[skillId]
+    if not profile then
+        return nil
+    end
+
+    return profile[marker] or profile.Slash1
+end
+
+local function playSkillBite(payload, fallbackPosition: Vector3)
+    local soundDef = resolveSkillSound(payload)
+    if not soundDef then
+        return
+    end
+
+    local position = if type(payload) == 'table' and typeof(payload.origin) == 'Vector3' then payload.origin else fallbackPosition
+    playWorldSound(soundDef.id, position, soundDef.volume or 0.6, soundDef.speed or 1, 1.8)
+end
+
 local function getCharacterRootFromPayload(payload): BasePart?
     if type(payload) ~= 'table' then
         return nil
@@ -595,6 +647,7 @@ local function playSlashEffect(payload, color: Color3, width: number)
     local direction = payload.direction or Vector3.new(0, 0, -1)
     local origin = payload.origin or Vector3.zero
     local range = payload.range or 10
+    playSkillBite(payload, origin)
     local look = Vector3.new(direction.X, 0, direction.Z)
     if look.Magnitude <= 0.001 then
         look = Vector3.new(0, 0, -1)
@@ -633,6 +686,7 @@ end
 local function playArcFlareEffect(payload)
     local direction = payload.direction or Vector3.new(0, 0, -1)
     local origin = payload.origin or Vector3.zero
+    playSkillBite(payload, origin)
     local vfx = payload.vfx or {}
     local duration = tonumber(vfx.duration) or 0.28
     local range = tonumber(vfx.range) or payload.range or 18
@@ -672,6 +726,7 @@ end
 local function playNovaStrikeEffect(payload)
     local direction = payload.direction or Vector3.new(0, 0, -1)
     local origin = payload.origin or Vector3.zero
+    playSkillBite(payload, origin)
     local vfx = payload.vfx or {}
     local range = tonumber(vfx.range) or payload.range or 24
     local duration = tonumber(vfx.duration) or 0.24
@@ -715,6 +770,7 @@ end
 
 local function playVortexSpinEffect(payload)
     local origin = payload.origin or Vector3.zero
+    playSkillBite(payload, origin)
     local vfx = payload.vfx or {}
     local duration = tonumber(vfx.duration) or 0.3
     local radius = tonumber(vfx.radius) or 5
@@ -745,6 +801,7 @@ end
 
 local function playCometDropEffect(payload)
     local origin = payload.origin or Vector3.zero
+    playSkillBite(payload, origin)
     local direction = payload.direction or Vector3.new(0, 0, -1)
     local vfx = payload.vfx or {}
     local look = getPlanarLookAndRight(direction)
@@ -789,6 +846,7 @@ end
 
 local function playRazorOrbitEffect(payload)
     local origin = payload.origin or Vector3.zero
+    playSkillBite(payload, origin)
     local direction = payload.direction or Vector3.new(0, 0, -1)
     local vfx = payload.vfx or {}
     local duration = tonumber(vfx.duration) or 0.24
