@@ -25,7 +25,7 @@ local shineClock = 0
 
 local COLLAPSED_SIZE = UDim2.fromOffset(336, 132)
 local EXPANDED_SIZE = UDim2.fromOffset(336, 346)
-local ROOT_POSITION = UDim2.fromOffset(12, 8)
+local ROOT_POSITION = UDim2.fromOffset(0, 0)
 
 local TOKENS = {
 	window = Color3.fromRGB(19, 25, 41),
@@ -445,7 +445,7 @@ local function ensureGui()
 	rootGui = Instance.new("ScreenGui")
 	rootGui.Name = "MMOHud"
 	rootGui.ResetOnSpawn = false
-	rootGui.IgnoreGuiInset = false
+	rootGui.IgnoreGuiInset = true
 	rootGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	rootGui.Parent = playerGui
 
