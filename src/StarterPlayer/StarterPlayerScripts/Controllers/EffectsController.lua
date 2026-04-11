@@ -285,6 +285,47 @@ local function spawnPowText(position: Vector3, color: Color3, text: string, scal
     Debris:AddItem(anchor, 0.35)
 end
 
+local function spawnDamageNumber(position: Vector3, amount: number, color: Color3, scale: number)
+    local anchor = Instance.new('Part')
+    anchor.Anchored = true
+    anchor.CanCollide = false
+    anchor.CanQuery = false
+    anchor.CanTouch = false
+    anchor.Transparency = 1
+    anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+    anchor.CFrame = CFrame.new(position)
+    anchor.Parent = getFxParent()
+
+    local billboard = Instance.new('BillboardGui')
+    billboard.Size = UDim2.fromOffset(math.floor(112 * scale), math.floor(56 * scale))
+    billboard.StudsOffset = Vector3.new(0, 1.4 + (0.52 * scale), 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = anchor
+
+    local label = Instance.new('TextLabel')
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBlack
+    label.TextScaled = true
+    label.Text = string.format('-%d', math.max(1, math.floor(amount)))
+    label.TextColor3 = color
+    label.TextStrokeTransparency = 0
+    label.TextStrokeColor3 = Color3.fromRGB(10, 12, 20)
+    label.Rotation = math.random(-9, 9)
+    label.Parent = billboard
+
+    local riseTween = TweenService:Create(billboard, TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        StudsOffset = billboard.StudsOffset + Vector3.new(0, 2.1, 0),
+    })
+    local fadeTween = TweenService:Create(label, TweenInfo.new(0.34, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0.1), {
+        TextTransparency = 1,
+        TextStrokeTransparency = 1,
+    })
+    riseTween:Play()
+    fadeTween:Play()
+    Debris:AddItem(anchor, 0.6)
+end
+
 local function playImpactPunch(position: Vector3, color: Color3, intensity: number)
     local scale = GLOBAL_IMPACT_SCALE * intensity
     local createPart = makeEffectPart
@@ -962,9 +1003,25 @@ local function playEnemyAttackEffect(payload)
     local soundId = payload.soundId or ATTACK_SOUND_ID
     local soundVolume = payload.soundVolume or 0.5
     local soundSpeed = payload.soundSpeed or 1
+    local phase = tostring(payload.phase or '')
     local direction = targetPosition - position
     local planar = direction.Magnitude > 0.001 and direction.Unit or Vector3.new(0, 0, -1)
     local rootCFrame = CFrame.lookAt(position, position + planar)
+
+    if phase == 'windup' then
+        local telegraph = makeEffectPart(
+            color:Lerp(Color3.new(1, 1, 1), 0.2),
+            Vector3.new(0.25, 4.4, 4.4),
+            CFrame.new(position + Vector3.new(0, 0.2, 0)) * CFrame.Angles(math.rad(90), 0, 0),
+            Enum.PartType.Cylinder,
+            0.24
+        )
+        tweenAndCleanup(telegraph, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = Vector3.new(0.25, 8.5, 8.5),
+            Transparency = 1,
+        })
+        return
+    end
 
     if attackKind == 'FrostPounce' then
         local streak = makeEffectPart(color, Vector3.new(2.4, 1.2, 12), rootCFrame * CFrame.new(0, 1.5, -6), nil, 0.25)
@@ -989,7 +1046,12 @@ local function playEnemyAttackEffect(payload)
         tweenAndCleanup(pulse, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = Vector3.new(0.4, 34, 34), Transparency = 1 })
         playWorldSound(soundId, position, soundVolume, soundSpeed, 2.2)
     else
-        local burst = makeEffectPart(color, Vector3.new(2.2, 2.2, 2.2), CFrame.new(position + Vector3.new(0, 2, 0)), Enum.PartType.Ball, 0.18)
+        local strike = makeEffectPart(color, Vector3.new(1.6, 1.2, 8), rootCFrame * CFrame.new(0, 1.8, -4), nil, 0.14)
+        tweenAndCleanup(strike, TweenInfo.new(0.14, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {
+            Size = Vector3.new(0.8, 0.8, 16),
+            Transparency = 1,
+        })
+        local burst = makeEffectPart(color, Vector3.new(2.2, 2.2, 2.2), CFrame.new(targetPosition + Vector3.new(0, 2, 0)), Enum.PartType.Ball, 0.12)
         tweenAndCleanup(burst, TweenInfo.new(0.16), { Size = Vector3.new(4, 4, 4), Transparency = 1 })
         playWorldSound(soundId, position, soundVolume, soundSpeed, 1.25)
     end
@@ -998,7 +1060,26 @@ end
 local function playEnemyHitEffect(payload)
     local color = payload.color or (payload.isBoss and Color3.fromRGB(255, 84, 120) or Color3.fromRGB(255, 255, 255))
     local intensity = if payload.isBoss then 1.25 else 1
-    playImpactPunch(payload.position or Vector3.zero, color, intensity)
+    local impactPosition = payload.position or Vector3.zero
+    playImpactPunch(impactPosition, color, intensity)
+
+    local damage = tonumber(payload.damage)
+    if damage and damage > 0 then
+        spawnDamageNumber(
+            impactPosition + Vector3.new(math.random(-2, 2) * 0.15, 1.5, math.random(-2, 2) * 0.15),
+            damage,
+            payload.isBoss and Color3.fromRGB(255, 168, 180) or Color3.fromRGB(255, 246, 198),
+            payload.isBoss and 1.12 or 1
+        )
+    end
+end
+
+local function playPlayerHitEffect(payload)
+    local position = payload.position or Vector3.zero
+    local damage = tonumber(payload.damage) or 1
+    local color = Color3.fromRGB(255, 96, 122)
+    playImpactPunch(position, color, 0.9)
+    spawnDamageNumber(position + Vector3.new(0, 0.5, 0), damage, Color3.fromRGB(255, 132, 148), 1.05)
 end
 
 local function playEnemyDeathEffect(payload)
@@ -1183,6 +1264,8 @@ function EffectsController.start()
             playEnemyHitEffect(payload)
         elseif effectName == MMONet.Effects.EnemyDeath then
             playEnemyDeathEffect(payload)
+        elseif effectName == MMONet.Effects.PlayerHit then
+            playPlayerHitEffect(payload)
         elseif effectName == MMONet.Effects.BossSlam then
             playBossSlamEffect(payload)
         end

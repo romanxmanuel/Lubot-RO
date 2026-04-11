@@ -29,6 +29,7 @@ MMONet.Effects = {
     EnemyAttack = 'EnemyAttack',
     EnemyHit = 'EnemyHit',
     EnemyDeath = 'EnemyDeath',
+    PlayerHit = 'PlayerHit',
     BossSlam = 'BossSlam',
 }
 

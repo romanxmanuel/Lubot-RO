@@ -24,6 +24,20 @@ type SpawnPlan = {
     randomSpawnWithinMap: boolean?,
 }
 
+type AttackRuntime = {
+    targetUserId: number,
+    startedAt: number,
+    phase: 'windup' | 'lunge' | 'recover',
+    phaseStartedAt: number,
+    origin: Vector3,
+    strikePosition: Vector3,
+    recoverPosition: Vector3,
+    windupDuration: number,
+    lungeDuration: number,
+    recoverDuration: number,
+    damageApplied: boolean,
+}
+
 type EnemyState = {
     runtimeId: string,
     plan: SpawnPlan,
@@ -42,6 +56,7 @@ type EnemyState = {
     nextStrafeSwapAt: number,
     roamTarget: Vector3?,
     nextRoamDecisionAt: number,
+    attackState: AttackRuntime?,
 }
 
 local dependencies = nil
@@ -453,17 +468,137 @@ local function chooseRoamTarget(state: EnemyState): Vector3
     return resolveGroundedPositionAt(state.plan.mapModel, probe, state.def)
 end
 
-local function fireEnemyAttackEffect(state: EnemyState, effectKind: string, targetPosition: Vector3?)
+local function fireEnemyAttackEffect(state: EnemyState, effectKind: string, targetPosition: Vector3?, phase: string?)
     dependencies.Runtime.EffectEvent:FireAllClients(MMONet.Effects.EnemyAttack, {
         position = state.root.Position,
         targetPosition = targetPosition,
         isBoss = state.plan.isBoss,
         attackKind = effectKind,
+        phase = phase,
         color = state.def.attackColor or state.def.color,
         soundId = state.def.attackSoundId,
         soundVolume = state.def.attackSoundVolume,
         soundSpeed = state.def.attackSoundSpeed,
     })
+end
+
+local function getLivePlayerByUserId(userId: number)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.UserId == userId then
+            local character = player.Character
+            local humanoid = character and character:FindFirstChildOfClass('Humanoid')
+            local root = character and character:FindFirstChild('HumanoidRootPart')
+            if humanoid and humanoid.Health > 0 and root and root:IsA('BasePart') then
+                return {
+                    player = player,
+                    root = root :: BasePart,
+                }
+            end
+            return nil
+        end
+    end
+    return nil
+end
+
+local function startMeleeAttack(state: EnemyState, targetEntry, now: number)
+    local offset = targetEntry.root.Position - state.root.Position
+    local planar = Vector3.new(offset.X, 0, offset.Z)
+    if planar.Magnitude <= 0.001 then
+        return
+    end
+
+    local forward = planar.Unit
+    local windupDuration = state.def.attackWindup or (state.plan.isBoss and 0.28 or 0.2)
+    local lungeDuration = state.def.attackLungeDuration or (state.plan.isBoss and 0.24 or 0.18)
+    local recoverDuration = state.def.attackRecoverDuration or (state.plan.isBoss and 0.32 or 0.24)
+    local lungeDistance = math.max(2.6, math.min(planar.Magnitude + 1.2, state.def.attackRange + 3.6))
+
+    local strikeProbe = state.root.Position + forward * lungeDistance
+    local strikePosition = resolveGroundedPositionAt(state.plan.mapModel, strikeProbe, state.def)
+    local recoverProbe = strikePosition - forward * math.max(1, state.def.attackRange * 0.2)
+    local recoverPosition = resolveGroundedPositionAt(state.plan.mapModel, recoverProbe, state.def)
+
+    state.attackState = {
+        targetUserId = targetEntry.player.UserId,
+        startedAt = now,
+        phase = 'windup',
+        phaseStartedAt = now,
+        origin = state.root.Position,
+        strikePosition = strikePosition,
+        recoverPosition = recoverPosition,
+        windupDuration = windupDuration,
+        lungeDuration = lungeDuration,
+        recoverDuration = recoverDuration,
+        damageApplied = false,
+    }
+
+    fireEnemyAttackEffect(state, state.def.attackEffect or (state.plan.isBoss and 'BossBite' or 'EnemyBite'), targetEntry.root.Position, 'windup')
+    state.nextAttackAt = now + windupDuration + lungeDuration + recoverDuration + (state.def.attackCooldown * 0.7)
+end
+
+local function stepActiveAttack(state: EnemyState, now: number): boolean
+    local attackState = state.attackState
+    if not attackState then
+        return false
+    end
+
+    local target = getLivePlayerByUserId(attackState.targetUserId)
+    local targetPosition = target and target.root.Position or attackState.strikePosition
+    local offset = targetPosition - state.root.Position
+    local planar = Vector3.new(offset.X, 0, offset.Z)
+    local originToStrike = attackState.strikePosition - attackState.origin
+    local originPlanar = Vector3.new(originToStrike.X, 0, originToStrike.Z)
+    local forward = if planar.Magnitude > 0.001 then planar.Unit else if originPlanar.Magnitude > 0.001 then originPlanar.Unit else Vector3.new(0, 0, -1)
+    if forward.Magnitude <= 0.001 then
+        forward = Vector3.new(0, 0, -1)
+    end
+
+    if attackState.phase == 'windup' then
+        local alpha = math.clamp((now - attackState.phaseStartedAt) / math.max(attackState.windupDuration, 0.01), 0, 1)
+        local backstep = math.sin(alpha * math.pi * 0.5) * math.max(0.7, state.def.attackRange * 0.14)
+        local rise = math.sin(alpha * math.pi) * (state.plan.isBoss and 1 or 0.6)
+        local position = attackState.origin - forward * backstep + Vector3.new(0, rise, 0)
+        setEnemyPosition(state, position, targetPosition)
+
+        if alpha >= 1 then
+            attackState.phase = 'lunge'
+            attackState.phaseStartedAt = now
+            fireEnemyAttackEffect(state, state.def.attackEffect or (state.plan.isBoss and 'BossBite' or 'EnemyBite'), targetPosition, 'strike')
+        end
+        return true
+    end
+
+    if attackState.phase == 'lunge' then
+        local alpha = math.clamp((now - attackState.phaseStartedAt) / math.max(attackState.lungeDuration, 0.01), 0, 1)
+        local launch = attackState.origin:Lerp(attackState.strikePosition, alpha)
+        local arc = math.sin(alpha * math.pi) * (state.plan.isBoss and 1.3 or 0.8)
+        local position = launch + Vector3.new(0, arc, 0)
+        setEnemyPosition(state, position, targetPosition)
+
+        local impactRange = state.def.attackRange + (state.plan.isBoss and 2.8 or 1.8)
+        if not attackState.damageApplied and target and (target.root.Position - position).Magnitude <= impactRange then
+            dependencies.CharacterService.damagePlayer(target.player, state.def.damage)
+            attackState.damageApplied = true
+        end
+
+        if alpha >= 1 then
+            attackState.phase = 'recover'
+            attackState.phaseStartedAt = now
+            if not attackState.damageApplied and target then
+                dependencies.CharacterService.damagePlayer(target.player, state.def.damage)
+                attackState.damageApplied = true
+            end
+        end
+        return true
+    end
+
+    local recoverAlpha = math.clamp((now - attackState.phaseStartedAt) / math.max(attackState.recoverDuration, 0.01), 0, 1)
+    local settle = attackState.strikePosition:Lerp(attackState.recoverPosition, recoverAlpha)
+    setEnemyPosition(state, settle, targetPosition)
+    if recoverAlpha >= 1 then
+        state.attackState = nil
+    end
+    return true
 end
 
 local function damagePlayerIfClose(playerEntry, position: Vector3, radius: number, amount: number)
@@ -555,6 +690,7 @@ local function spawnFromPlan(plan: SpawnPlan)
         nextStrafeSwapAt = os.clock() + 0.8 + math.random() * 1.2,
         roamTarget = nil,
         nextRoamDecisionAt = os.clock() + 0.8 + math.random() * 1.2,
+        attackState = nil,
     }
 
     enemyStates[runtimeId] = state
@@ -659,8 +795,12 @@ local function stepEnemy(state: EnemyState, deltaTime: number)
         return
     end
 
-    local closest, distance = getClosestPlayerTo(state.root.Position, state.def.aggroRange)
     local now = os.clock()
+    if state.attackState and stepActiveAttack(state, now) then
+        return
+    end
+
+    local closest, distance = getClosestPlayerTo(state.root.Position, state.def.aggroRange)
     local profile = getMovementProfile(state.def)
 
     if closest then
@@ -700,9 +840,7 @@ local function stepEnemy(state: EnemyState, deltaTime: number)
                 setEnemyPosition(state, nextPosition, targetPosition)
             end
         elseif now >= state.nextAttackAt then
-            fireEnemyAttackEffect(state, state.def.attackEffect or (state.plan.isBoss and 'BossBite' or 'EnemyBite'), targetPosition)
-            dependencies.CharacterService.damagePlayer(closest.player, state.def.damage)
-            state.nextAttackAt = now + state.def.attackCooldown
+            startMeleeAttack(state, closest, now)
         end
         return
     end
@@ -813,6 +951,7 @@ function EnemyServiceV2.damageEnemy(runtimeId: string, amount: number, attacker:
         position = state.root.Position,
         isBoss = state.plan.isBoss,
         color = state.def.attackColor or state.def.color,
+        damage = amount,
     })
 
     if state.currentHealth > 0 then

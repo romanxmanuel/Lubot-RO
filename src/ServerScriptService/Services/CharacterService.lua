@@ -280,8 +280,16 @@ end
 function CharacterService.damagePlayer(player: Player, amount: number)
     local humanoid = getHumanoid(player)
     if humanoid and humanoid.Health > 0 then
+        local root = CharacterService.getHumanoidRootPart(player)
         humanoid:TakeDamage(amount)
         player:SetAttribute('HP', humanoid.Health)
+        if root then
+            dependencies.Runtime.EffectEvent:FireAllClients(MMONet.Effects.PlayerHit, {
+                userId = player.UserId,
+                position = root.Position + Vector3.new(0, 2, 0),
+                damage = amount,
+            })
+        end
     end
 end
 
