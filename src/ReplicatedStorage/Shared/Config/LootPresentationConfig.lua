@@ -2,7 +2,7 @@
 
 local LootPresentationConfig = {
     PickupMaxDistance = 7,
-    DespawnSeconds = 45,
+    DespawnSeconds = 18,
     BillboardMaxDistance = 78,
     PromptActionText = 'Pick',
     PromptObjectText = '',

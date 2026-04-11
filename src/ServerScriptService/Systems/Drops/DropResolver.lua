@@ -10,6 +10,14 @@ local LootConfig = require(ReplicatedStorage.Shared.Config.LootConfig)
 local WeightedRandom = require(ReplicatedStorage.Shared.Loot.WeightedRandom)
 
 local DropResolver = {}
+local RARITY_SCORE = {
+    Common = 1,
+    Uncommon = 2,
+    Rare = 3,
+    Epic = 4,
+    Legendary = 5,
+    Mythic = 6,
+}
 
 local function rollQuantity(quantityDef, rng)
     if not quantityDef then
@@ -107,6 +115,44 @@ local function buildMonsterBurstCandidates(dropTable)
     return candidates
 end
 
+local function getDropValueScore(drop)
+    local rarityScore = RARITY_SCORE[tostring(drop.rarity or 'Common')] or 1
+    local score = rarityScore * 10
+    if drop.kind == 'card' then
+        score += 120
+    end
+    if drop.chaseDrop == true then
+        score += 90
+    end
+    if drop.exclusive == true then
+        score += 80
+    end
+    return score
+end
+
+local function compactMonsterDrops(drops, rng)
+    if #drops == 0 then
+        return drops
+    end
+
+    table.sort(drops, function(a, b)
+        return getDropValueScore(a) > getDropValueScore(b)
+    end)
+
+    local best = drops[1]
+    if not best then
+        return {}
+    end
+
+    local rarity = tostring(best.rarity or 'Common')
+    local keepCommon = rarity ~= 'Common' or rng:NextNumber() <= 0.35
+    if not keepCommon then
+        return {}
+    end
+
+    return { best }
+end
+
 function DropResolver.roll(dropTableId: string, context)
     local dropTable = DropTableDefs[dropTableId]
     assert(dropTable, ('Unknown dropTableId: %s'):format(dropTableId))
@@ -141,21 +187,7 @@ function DropResolver.roll(dropTableId: string, context)
     end
 
     if dropTable.tableType == 'Monster' then
-        local targetDropCount = rng:NextInteger(1, 2)
-        if #drops > targetDropCount then
-            while #drops > targetDropCount do
-                table.remove(drops)
-            end
-        elseif #drops < targetDropCount then
-            local burstCandidates = buildMonsterBurstCandidates(dropTable)
-            while #drops < targetDropCount and #burstCandidates > 0 do
-                local picked = WeightedRandom.pick(burstCandidates, rng)
-                if not picked then
-                    break
-                end
-                table.insert(drops, buildDrop(picked, picked.category, rng))
-            end
-        end
+        drops = compactMonsterDrops(drops, rng)
     end
 
     return {

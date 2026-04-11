@@ -289,7 +289,7 @@ local function createDropPart(runtimeId: string, drop, position: Vector3)
     dropPart.CanCollide = false
     dropPart.CanTouch = false
     dropPart.CanQuery = true
-    dropPart.Material = visual.material or if drop.rarity == 'Legendary' or drop.rarity == 'Mythic' then Enum.Material.Neon else Enum.Material.SmoothPlastic
+    dropPart.Material = Enum.Material.SmoothPlastic
     dropPart.Color = visual.color
     dropPart.Transparency = visual.partTransparency
     dropPart.CFrame = CFrame.new(groundedPosition)
@@ -307,12 +307,6 @@ local function createDropPart(runtimeId: string, drop, position: Vector3)
     selectionBox.SurfaceTransparency = 1
     selectionBox.Transparency = visual.glowTransparency or 0.62
     selectionBox.Parent = dropPart
-
-    local pointLight = Instance.new('PointLight')
-    pointLight.Color = visual.color
-    pointLight.Brightness = visual.lightBrightness
-    pointLight.Range = visual.lightRange
-    pointLight.Parent = dropPart
 
     styleBillboard(dropPart, drop)
     styleDropSound(dropPart, drop)
