@@ -21,10 +21,11 @@ local rootGui: ScreenGui? = nil
 local refs = {}
 local expanded = false
 local desiredInventoryVisible: boolean? = nil
+local shineClock = 0
 
-local COLLAPSED_SIZE = UDim2.fromOffset(336, 148)
-local EXPANDED_SIZE = UDim2.fromOffset(336, 360)
-local ROOT_POSITION = UDim2.fromOffset(12, 72)
+local COLLAPSED_SIZE = UDim2.fromOffset(336, 132)
+local EXPANDED_SIZE = UDim2.fromOffset(336, 346)
+local ROOT_POSITION = UDim2.fromOffset(12, 8)
 
 local TOKENS = {
 	window = Color3.fromRGB(19, 25, 41),
@@ -35,6 +36,7 @@ local TOKENS = {
 	lineSoft = Color3.fromRGB(68, 90, 132),
 	bevelLight = Color3.fromRGB(176, 209, 255),
 	bevelDark = Color3.fromRGB(12, 16, 30),
+	glow = Color3.fromRGB(76, 152, 255),
 	title = Color3.fromRGB(236, 244, 255),
 	body = Color3.fromRGB(171, 198, 236),
 	muted = Color3.fromRGB(130, 157, 198),
@@ -190,8 +192,8 @@ local function createChromeFrame(parent: Instance, name: string, size: UDim2, po
 	return frame
 end
 
-local function createCompactBar(parent: Instance, name: string, fillColor: Color3, position: UDim2)
-	local holder = createPanel(parent, name .. "Bar", UDim2.fromOffset(132, 17), position, TOKENS.panelInset, 6)
+local function createCompactBar(parent: Instance, name: string, fillColor: Color3, position: UDim2, width: number)
+	local holder = createPanel(parent, name .. "Bar", UDim2.fromOffset(width, 20), position, TOKENS.panelInset, 6)
 	makeStroke(holder, TOKENS.lineSoft, 0.18, 1)
 	applyBevel(holder, 0.4, 0.65)
 
@@ -211,17 +213,40 @@ local function createCompactBar(parent: Instance, name: string, fillColor: Color
 	})
 	gradient.Parent = fill
 
+	local shine = Instance.new("Frame")
+	shine.Name = "Shine"
+	shine.Size = UDim2.fromScale(1, 1)
+	shine.BackgroundColor3 = Color3.new(1, 1, 1)
+	shine.BackgroundTransparency = 0.6
+	shine.BorderSizePixel = 0
+	shine.ZIndex = 3
+	shine.Parent = fill
+	makeCorner(shine, 6)
+
+	local shineGradient = Instance.new("UIGradient")
+	shineGradient.Rotation = 20
+	shineGradient.Offset = Vector2.new(-1.2, 0)
+	shineGradient.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(1, 1, 1))
+	shineGradient.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.38, 1),
+		NumberSequenceKeypoint.new(0.5, 0.35),
+		NumberSequenceKeypoint.new(0.62, 1),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	shineGradient.Parent = shine
+
 	local label = createText(holder, {
 		text = name,
 		size = UDim2.fromScale(1, 1),
-		textSize = 9,
+		textSize = 10,
 		textColor3 = Color3.fromRGB(255, 255, 255),
 		textXAlignment = Enum.TextXAlignment.Center,
 		font = Enum.Font.ArialBold,
 		zIndex = 4,
 	})
 
-	return holder, fill, label
+	return holder, fill, label, shineGradient
 end
 
 local function getStatRatio(current: number, maximum: number): number
@@ -415,6 +440,7 @@ local function ensureGui()
 
 	refs = {}
 	expanded = false
+	refs.barShines = {}
 
 	rootGui = Instance.new("ScreenGui")
 	rootGui.Name = "MMOHud"
@@ -424,12 +450,31 @@ local function ensureGui()
 	rootGui.Parent = playerGui
 
 	local dashboard = createChromeFrame(rootGui, "Dashboard", COLLAPSED_SIZE, ROOT_POSITION, TOKENS.window, 10)
+	local dashboardGradient = Instance.new("UIGradient")
+	dashboardGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(27, 34, 56)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 20, 34)),
+	})
+	dashboardGradient.Rotation = 90
+	dashboardGradient.Parent = dashboard
 
-	local header = createPanel(dashboard, "Header", UDim2.new(1, -8, 0, 62), UDim2.fromOffset(4, 4), TOKENS.windowInset, 8)
+	local dashboardGlow = Instance.new("Frame")
+	dashboardGlow.Name = "DashboardGlow"
+	dashboardGlow.AnchorPoint = Vector2.new(0.5, 0.5)
+	dashboardGlow.Position = UDim2.fromScale(0.5, 0.5)
+	dashboardGlow.Size = UDim2.new(1, 10, 1, 10)
+	dashboardGlow.BackgroundColor3 = TOKENS.glow
+	dashboardGlow.BackgroundTransparency = 0.93
+	dashboardGlow.BorderSizePixel = 0
+	dashboardGlow.ZIndex = 0
+	dashboardGlow.Parent = dashboard
+	makeCorner(dashboardGlow, 14)
+
+	local header = createPanel(dashboard, "Header", UDim2.new(1, -8, 0, 50), UDim2.fromOffset(4, 4), TOKENS.windowInset, 8)
 	makeStroke(header, TOKENS.lineSoft, 0.2, 1)
 	applyBevel(header, 0.28, 0.58)
 
-	local titleBar = createPanel(header, "TitleBar", UDim2.new(1, -4, 0, 14), UDim2.fromOffset(2, 2), TOKENS.blueBottom, 4)
+	local titleBar = createPanel(header, "TitleBar", UDim2.new(1, -4, 0, 12), UDim2.fromOffset(2, 2), TOKENS.blueBottom, 4)
 	local titleBarGradient = Instance.new("UIGradient")
 	titleBarGradient.Color = ColorSequence.new({
 		ColorSequenceKeypoint.new(0, TOKENS.blueTop),
@@ -438,18 +483,18 @@ local function ensureGui()
 	titleBarGradient.Rotation = 90
 	titleBarGradient.Parent = titleBar
 
-	local avatarFrame = createPanel(header, "AvatarFrame", UDim2.fromOffset(42, 42), UDim2.fromOffset(8, 18), TOKENS.panelInset, 21)
+	local avatarFrame = createPanel(header, "AvatarFrame", UDim2.fromOffset(34, 34), UDim2.fromOffset(8, 14), TOKENS.panelInset, 17)
 	makeStroke(avatarFrame, TOKENS.lineSoft, 0.1, 1)
 	applyBevel(avatarFrame, 0.3, 0.65)
 
 	local avatarImage = Instance.new("ImageLabel")
 	avatarImage.Name = "AvatarImage"
 	avatarImage.BackgroundTransparency = 1
-	avatarImage.Size = UDim2.fromOffset(38, 38)
+	avatarImage.Size = UDim2.fromOffset(30, 30)
 	avatarImage.Position = UDim2.fromOffset(2, 2)
 	avatarImage.ScaleType = Enum.ScaleType.Crop
 	avatarImage.Parent = avatarFrame
-	makeCorner(avatarImage, 19)
+	makeCorner(avatarImage, 15)
 	local okThumb, thumb = pcall(function()
 		return Players:GetUserThumbnailAsync(localPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
 	end)
@@ -459,20 +504,11 @@ local function ensureGui()
 
 	createText(header, {
 		text = "Player Profile",
-		position = UDim2.fromOffset(58, 18),
-		size = UDim2.fromOffset(170, 16),
-		textSize = 16,
+		position = UDim2.fromOffset(48, 14),
+		size = UDim2.fromOffset(150, 14),
+		textSize = 14,
 		font = Enum.Font.GothamBold,
 		textColor3 = TOKENS.title,
-	})
-
-	createText(header, {
-		text = "Core stats and progress",
-		position = UDim2.fromOffset(58, 35),
-		size = UDim2.fromOffset(170, 12),
-		textSize = 10,
-		font = Enum.Font.Gotham,
-		textColor3 = TOKENS.muted,
 	})
 
 	local expandButton = createButton(header, "+", UDim2.fromOffset(26, 22), UDim2.new(1, -30, 0.5, -8))
@@ -483,35 +519,41 @@ local function ensureGui()
 
 	local zenyLabel = createText(dashboard, {
 		text = "Zeny 0",
-		position = UDim2.fromOffset(10, 70),
-		size = UDim2.fromOffset(130, 16),
-		textSize = 13,
+		position = UDim2.fromOffset(12, 56),
+		size = UDim2.fromOffset(160, 14),
+		textSize = 12,
 		font = Enum.Font.GothamBold,
 		textColor3 = TOKENS.gold,
 	})
 
 	local classLabel = createText(dashboard, {
 		text = "Knight  Lv.1 / Job 1",
-		position = UDim2.fromOffset(10, 87),
-		size = UDim2.fromOffset(230, 13),
-		textSize = 11,
+		position = UDim2.fromOffset(12, 70),
+		size = UDim2.fromOffset(200, 12),
+		textSize = 10,
 		font = Enum.Font.Gotham,
 		textColor3 = TOKENS.body,
 	})
 
-	local barsCard = createPanel(dashboard, "BarsCard", UDim2.new(1, -8, 0, 42), UDim2.fromOffset(4, 102), TOKENS.panel, 6)
+	local barsCard = createPanel(dashboard, "BarsCard", UDim2.new(1, -8, 0, 50), UDim2.fromOffset(4, 82), TOKENS.panel, 6)
 	makeStroke(barsCard, TOKENS.lineSoft, 0.18, 1)
 	applyBevel(barsCard, 0.3, 0.6)
 
-	local _, hpFill, hpLabel = createCompactBar(barsCard, "HP", TOKENS.hp, UDim2.fromOffset(4, 4))
-	local _, spFill, spLabel = createCompactBar(barsCard, "SP", TOKENS.sp, UDim2.fromOffset(170, 4))
-	local _, expFill, expLabel = createCompactBar(barsCard, "EXP", TOKENS.exp, UDim2.fromOffset(4, 22))
-	local _, jexpFill, jexpLabel = createCompactBar(barsCard, "LV", TOKENS.jexp, UDim2.fromOffset(170, 22))
+	local _, hpFill, hpLabel, hpShine = createCompactBar(barsCard, "HP", TOKENS.hp, UDim2.fromOffset(4, 4), 160)
+	local _, spFill, spLabel, spShine = createCompactBar(barsCard, "SP", TOKENS.sp, UDim2.fromOffset(172, 4), 160)
+	local _, expFill, expLabel, expShine = createCompactBar(barsCard, "EXP", TOKENS.exp, UDim2.fromOffset(4, 26), 160)
+	local _, jexpFill, jexpLabel, jexpShine = createCompactBar(barsCard, "LV", TOKENS.jexp, UDim2.fromOffset(172, 26), 160)
+	refs.barShines = {
+		{ gradient = hpShine, speed = 0.65, phase = 0 },
+		{ gradient = spShine, speed = 0.72, phase = 0.22 },
+		{ gradient = expShine, speed = 0.58, phase = 0.44 },
+		{ gradient = jexpShine, speed = 0.5, phase = 0.66 },
+	}
 
 	local expandedSection = Instance.new("Frame")
 	expandedSection.Name = "ExpandedSection"
 	expandedSection.BackgroundTransparency = 1
-	expandedSection.Position = UDim2.fromOffset(4, 148)
+	expandedSection.Position = UDim2.fromOffset(4, 132)
 	expandedSection.Size = UDim2.new(1, -8, 0, 202)
 	expandedSection.Visible = false
 	expandedSection.Parent = dashboard
@@ -642,7 +684,7 @@ local function ensureGui()
 	utilityFrame.Name = "UtilityButtons"
 	utilityFrame.BackgroundTransparency = 1
 	utilityFrame.Size = UDim2.fromOffset(118, 26)
-	utilityFrame.Position = UDim2.new(0, 350, 0, 72)
+	utilityFrame.Position = UDim2.new(0, 350, 0, 10)
 	utilityFrame.ZIndex = 5
 	utilityFrame.Parent = rootGui
 
@@ -739,6 +781,21 @@ local function updateSummary()
 	refreshStatsSection()
 end
 
+local function updateBarShines(deltaTime: number)
+	if not refs.barShines then
+		return
+	end
+
+	shineClock += deltaTime
+	for _, shineData in ipairs(refs.barShines) do
+		local gradient = shineData.gradient
+		if gradient and gradient.Parent then
+			local travel = ((shineClock * shineData.speed) + shineData.phase) % 2
+			gradient.Offset = Vector2.new(travel - 1, 0)
+		end
+	end
+end
+
 function HUDController.init(deps)
 	dependencies = deps
 end
@@ -766,9 +823,10 @@ function HUDController.start()
 		end
 	end)
 
-	RunService.RenderStepped:Connect(function()
+	RunService.RenderStepped:Connect(function(deltaTime)
 		updateSummary()
 		updateBossBar()
+		updateBarShines(deltaTime)
 	end)
 end
 
