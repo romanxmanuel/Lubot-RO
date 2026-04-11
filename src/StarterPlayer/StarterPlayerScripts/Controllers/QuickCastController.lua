@@ -25,6 +25,50 @@ local DEFAULT_COOLDOWN_SECONDS = 1.5
 local QUICK_CAST_RETRY_SECONDS = 0.18
 local QUICK_CAST_RETRY_STEP = 0.03
 local AUTO_TARGET_RANGE = 120
+local DEFAULT_MOVEMENT_PROFILE = 'nudge'
+local IMPORTED_TOOL_DEFAULT_MOVEMENT_PROFILE = 'none'
+
+local MOVEMENT_PROFILE_ATTRIBUTE = 'QuickCastMovementProfile'
+local MOVEMENT_STEP_ATTRIBUTE = 'QuickCastStepDistance'
+local MOVEMENT_STOP_RANGE_ATTRIBUTE = 'QuickCastStopRange'
+local MOVEMENT_TRIGGER_RANGE_ATTRIBUTE = 'QuickCastTriggerRange'
+local MOVEMENT_VERTICAL_LIFT_ATTRIBUTE = 'QuickCastVerticalLift'
+
+local MOVEMENT_PROFILES = {
+    none = {
+        enabled = false,
+    },
+    nudge = {
+        enabled = true,
+        stepDistance = 4.5,
+        stopRange = 8,
+        triggerRange = 22,
+        verticalLift = 0,
+    },
+    lunge = {
+        enabled = true,
+        stepDistance = 8.5,
+        stopRange = 6,
+        triggerRange = 30,
+        verticalLift = 0.8,
+    },
+    dash = {
+        enabled = true,
+        stepDistance = 12,
+        stopRange = 4,
+        triggerRange = 36,
+        verticalLift = 1.5,
+    },
+}
+
+local TOOL_NAME_MOVEMENT_PROFILE = {
+    ['Power Slash'] = 'lunge',
+    ['Arc Flare'] = 'lunge',
+    ['Nova Strike'] = 'nudge',
+    ['Vortex Spin'] = 'lunge',
+    ['Comet Drop'] = 'dash',
+    ['Razor Orbit'] = 'nudge',
+}
 
 local COOLDOWN_ATTRIBUTE_NAMES = {
     'CooldownSeconds',
@@ -202,6 +246,76 @@ local function resolveToolCooldownSeconds(tool: Tool?): number
     return DEFAULT_COOLDOWN_SECONDS
 end
 
+local function readPositiveNumberAttribute(tool: Tool, attributeName: string): number?
+    local raw = tool:GetAttribute(attributeName)
+    if typeof(raw) == 'number' and raw > 0 then
+        return raw
+    end
+    if typeof(raw) == 'string' then
+        local parsed = tonumber(raw)
+        if parsed and parsed > 0 then
+            return parsed
+        end
+    end
+    return nil
+end
+
+local function resolveMovementProfileName(tool: Tool): string
+    local configured = tool:GetAttribute(MOVEMENT_PROFILE_ATTRIBUTE)
+    if typeof(configured) == 'string' then
+        local normalized = string.lower(configured)
+        if MOVEMENT_PROFILES[normalized] then
+            return normalized
+        end
+    end
+
+    if tool:GetAttribute('ImportedAssetId') ~= nil then
+        return IMPORTED_TOOL_DEFAULT_MOVEMENT_PROFILE
+    end
+
+    local byName = TOOL_NAME_MOVEMENT_PROFILE[tool.Name]
+    if byName and MOVEMENT_PROFILES[byName] then
+        return byName
+    end
+
+    return DEFAULT_MOVEMENT_PROFILE
+end
+
+local function resolveToolMovementProfile(tool: Tool)
+    local profileName = resolveMovementProfileName(tool)
+    local baseProfile = MOVEMENT_PROFILES[profileName] or MOVEMENT_PROFILES.none
+    local resolvedProfile = {
+        enabled = baseProfile.enabled == true,
+        stepDistance = baseProfile.stepDistance or 0,
+        stopRange = baseProfile.stopRange or 0,
+        triggerRange = baseProfile.triggerRange or 0,
+        verticalLift = baseProfile.verticalLift or 0,
+    }
+
+    local stepOverride = readPositiveNumberAttribute(tool, MOVEMENT_STEP_ATTRIBUTE)
+    if stepOverride then
+        resolvedProfile.stepDistance = stepOverride
+        resolvedProfile.enabled = stepOverride > 0
+    end
+
+    local stopOverride = readPositiveNumberAttribute(tool, MOVEMENT_STOP_RANGE_ATTRIBUTE)
+    if stopOverride then
+        resolvedProfile.stopRange = stopOverride
+    end
+
+    local triggerOverride = readPositiveNumberAttribute(tool, MOVEMENT_TRIGGER_RANGE_ATTRIBUTE)
+    if triggerOverride then
+        resolvedProfile.triggerRange = triggerOverride
+    end
+
+    local liftOverride = readPositiveNumberAttribute(tool, MOVEMENT_VERTICAL_LIFT_ATTRIBUTE)
+    if liftOverride then
+        resolvedProfile.verticalLift = liftOverride
+    end
+
+    return resolvedProfile
+end
+
 local function getTargetPositionFromTrackedTarget(): Vector3?
     if not dependencies or not dependencies.TargetingController then
         return nil
@@ -254,29 +368,80 @@ local function getNearestEnemyPosition(origin: Vector3): Vector3?
     return nearestPosition
 end
 
-local function faceNearestEnemy()
+local function faceNearestEnemy(): (BasePart?, Vector3?, number)
     local character = localPlayer.Character
     if not character then
-        return
+        return nil, nil, 0
     end
 
     local root = character:FindFirstChild('HumanoidRootPart')
     if not root or not root:IsA('BasePart') then
-        return
+        return nil, nil, 0
     end
 
     local targetPosition = getNearestEnemyPosition(root.Position)
     if not targetPosition then
-        return
+        return root, nil, 0
     end
 
     local planarTarget = Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z)
     local direction = planarTarget - root.Position
     if direction.Magnitude <= 0.001 then
-        return
+        return root, planarTarget, 0
     end
 
     root.CFrame = CFrame.lookAt(root.Position, planarTarget)
+    return root, planarTarget, direction.Magnitude
+end
+
+local function applyMovementAssist(tool: Tool, root: BasePart?, planarTarget: Vector3?, currentDistance: number)
+    if not root or not planarTarget then
+        return
+    end
+
+    local profile = resolveToolMovementProfile(tool)
+    if not profile.enabled then
+        return
+    end
+
+    if currentDistance <= profile.stopRange or currentDistance > profile.triggerRange then
+        return
+    end
+
+    local toTarget = planarTarget - root.Position
+    local planarDistance = toTarget.Magnitude
+    if planarDistance <= 0.001 then
+        return
+    end
+
+    local approachDistance = math.min(profile.stepDistance, planarDistance - profile.stopRange)
+    if approachDistance <= 0.05 then
+        return
+    end
+
+    local direction = toTarget.Unit
+    local character = root.Parent
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.FilterDescendantsInstances = if character then { character } else {}
+    raycastParams.IgnoreWater = true
+    local rayResult = workspace:Raycast(root.Position + Vector3.new(0, 1.4, 0), direction * approachDistance, raycastParams)
+    if rayResult then
+        approachDistance = math.max(rayResult.Distance - 1.5, 0)
+    end
+    if approachDistance <= 0.05 then
+        return
+    end
+
+    local destination = root.Position + direction * approachDistance
+    local humanoid = if character then character:FindFirstChildOfClass('Humanoid') else nil
+    local lift = profile.verticalLift
+    if humanoid and humanoid.FloorMaterial ~= Enum.Material.Air then
+        lift = 0
+    end
+    destination = Vector3.new(destination.X, root.Position.Y + lift, destination.Z)
+    local lookTarget = Vector3.new(planarTarget.X, destination.Y, planarTarget.Z)
+    root.CFrame = CFrame.lookAt(destination, lookTarget)
 end
 
 local function beginSlotCooldown(slotIndex: number, durationSeconds: number)
@@ -354,7 +519,8 @@ local function attemptQuickCast(slotIndex: number, token: number)
         return
     end
 
-    faceNearestEnemy()
+    local root, planarTarget, distance = faceNearestEnemy()
+    applyMovementAssist(tool, root, planarTarget, distance)
 
     local activated = false
     local ok = pcall(function()
