@@ -22,34 +22,34 @@ local refs = {}
 local expanded = false
 local desiredInventoryVisible: boolean? = nil
 
-local COLLAPSED_SIZE = UDim2.fromOffset(288, 112)
-local EXPANDED_SIZE = UDim2.fromOffset(288, 318)
-local ROOT_POSITION = UDim2.fromOffset(12, 12)
+local COLLAPSED_SIZE = UDim2.fromOffset(336, 148)
+local EXPANDED_SIZE = UDim2.fromOffset(336, 360)
+local ROOT_POSITION = UDim2.fromOffset(12, 72)
 
 local TOKENS = {
-	window = Color3.fromRGB(229, 235, 244),
-	windowInset = Color3.fromRGB(246, 248, 252),
-	panel = Color3.fromRGB(217, 224, 236),
-	panelInset = Color3.fromRGB(248, 250, 254),
-	line = Color3.fromRGB(113, 124, 156),
-	lineSoft = Color3.fromRGB(171, 181, 204),
-	bevelLight = Color3.fromRGB(255, 255, 255),
-	bevelDark = Color3.fromRGB(142, 151, 179),
-	title = Color3.fromRGB(39, 44, 61),
-	body = Color3.fromRGB(78, 85, 106),
-	muted = Color3.fromRGB(115, 122, 146),
-	gold = Color3.fromRGB(170, 126, 44),
-	blueTop = Color3.fromRGB(131, 154, 214),
-	blueBottom = Color3.fromRGB(92, 116, 176),
-	button = Color3.fromRGB(93, 112, 170),
-	buttonHover = Color3.fromRGB(109, 128, 186),
-	buttonText = Color3.fromRGB(248, 251, 255),
-	hp = Color3.fromRGB(220, 88, 118),
-	sp = Color3.fromRGB(87, 149, 226),
-	exp = Color3.fromRGB(84, 193, 145),
-	jexp = Color3.fromRGB(165, 108, 226),
-	bossBack = Color3.fromRGB(74, 38, 46),
-	bossFill = Color3.fromRGB(212, 78, 104),
+	window = Color3.fromRGB(19, 25, 41),
+	windowInset = Color3.fromRGB(26, 33, 52),
+	panel = Color3.fromRGB(24, 31, 49),
+	panelInset = Color3.fromRGB(33, 41, 63),
+	line = Color3.fromRGB(90, 116, 162),
+	lineSoft = Color3.fromRGB(68, 90, 132),
+	bevelLight = Color3.fromRGB(176, 209, 255),
+	bevelDark = Color3.fromRGB(12, 16, 30),
+	title = Color3.fromRGB(236, 244, 255),
+	body = Color3.fromRGB(171, 198, 236),
+	muted = Color3.fromRGB(130, 157, 198),
+	gold = Color3.fromRGB(247, 218, 126),
+	blueTop = Color3.fromRGB(104, 178, 255),
+	blueBottom = Color3.fromRGB(64, 108, 201),
+	button = Color3.fromRGB(66, 98, 166),
+	buttonHover = Color3.fromRGB(89, 129, 214),
+	buttonText = Color3.fromRGB(243, 248, 255),
+	hp = Color3.fromRGB(243, 92, 126),
+	sp = Color3.fromRGB(76, 170, 248),
+	exp = Color3.fromRGB(95, 224, 168),
+	jexp = Color3.fromRGB(165, 124, 255),
+	bossBack = Color3.fromRGB(44, 19, 38),
+	bossFill = Color3.fromRGB(224, 67, 114),
 }
 
 local function prettyClassName(classId: string): string
@@ -425,11 +425,11 @@ local function ensureGui()
 
 	local dashboard = createChromeFrame(rootGui, "Dashboard", COLLAPSED_SIZE, ROOT_POSITION, TOKENS.window, 10)
 
-	local header = createPanel(dashboard, "Header", UDim2.new(1, -8, 0, 28), UDim2.fromOffset(4, 4), TOKENS.windowInset, 6)
+	local header = createPanel(dashboard, "Header", UDim2.new(1, -8, 0, 62), UDim2.fromOffset(4, 4), TOKENS.windowInset, 8)
 	makeStroke(header, TOKENS.lineSoft, 0.2, 1)
 	applyBevel(header, 0.28, 0.58)
 
-	local titleBar = createPanel(header, "TitleBar", UDim2.new(1, -4, 0, 10), UDim2.fromOffset(2, 2), TOKENS.blueBottom, 4)
+	local titleBar = createPanel(header, "TitleBar", UDim2.new(1, -4, 0, 14), UDim2.fromOffset(2, 2), TOKENS.blueBottom, 4)
 	local titleBarGradient = Instance.new("UIGradient")
 	titleBarGradient.Color = ColorSequence.new({
 		ColorSequenceKeypoint.new(0, TOKENS.blueTop),
@@ -438,24 +438,44 @@ local function ensureGui()
 	titleBarGradient.Rotation = 90
 	titleBarGradient.Parent = titleBar
 
+	local avatarFrame = createPanel(header, "AvatarFrame", UDim2.fromOffset(42, 42), UDim2.fromOffset(8, 18), TOKENS.panelInset, 21)
+	makeStroke(avatarFrame, TOKENS.lineSoft, 0.1, 1)
+	applyBevel(avatarFrame, 0.3, 0.65)
+
+	local avatarImage = Instance.new("ImageLabel")
+	avatarImage.Name = "AvatarImage"
+	avatarImage.BackgroundTransparency = 1
+	avatarImage.Size = UDim2.fromOffset(38, 38)
+	avatarImage.Position = UDim2.fromOffset(2, 2)
+	avatarImage.ScaleType = Enum.ScaleType.Crop
+	avatarImage.Parent = avatarFrame
+	makeCorner(avatarImage, 19)
+	local okThumb, thumb = pcall(function()
+		return Players:GetUserThumbnailAsync(localPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+	end)
+	if okThumb and thumb then
+		avatarImage.Image = thumb
+	end
+
 	createText(header, {
-		text = "Status",
-		position = UDim2.fromOffset(10, 2),
-		size = UDim2.fromOffset(96, 16),
-		textSize = 15,
-		font = Enum.Font.ArialBold,
+		text = "Player Profile",
+		position = UDim2.fromOffset(58, 18),
+		size = UDim2.fromOffset(170, 16),
+		textSize = 16,
+		font = Enum.Font.GothamBold,
+		textColor3 = TOKENS.title,
 	})
 
 	createText(header, {
 		text = "Core stats and progress",
-		position = UDim2.fromOffset(10, 15),
-		size = UDim2.fromOffset(140, 10),
-		textSize = 9,
-		font = Enum.Font.Arial,
+		position = UDim2.fromOffset(58, 35),
+		size = UDim2.fromOffset(170, 12),
+		textSize = 10,
+		font = Enum.Font.Gotham,
 		textColor3 = TOKENS.muted,
 	})
 
-	local expandButton = createButton(header, "+", UDim2.fromOffset(20, 18), UDim2.new(1, -25, 0.5, -7))
+	local expandButton = createButton(header, "+", UDim2.fromOffset(26, 22), UDim2.new(1, -30, 0.5, -8))
 	expandButton.TextSize = 14
 	expandButton.MouseButton1Click:Connect(function()
 		setExpanded(not expanded)
@@ -463,35 +483,35 @@ local function ensureGui()
 
 	local zenyLabel = createText(dashboard, {
 		text = "Zeny 0",
-		position = UDim2.fromOffset(8, 36),
-		size = UDim2.fromOffset(100, 13),
-		textSize = 12,
-		font = Enum.Font.ArialBold,
+		position = UDim2.fromOffset(10, 70),
+		size = UDim2.fromOffset(130, 16),
+		textSize = 13,
+		font = Enum.Font.GothamBold,
 		textColor3 = TOKENS.gold,
 	})
 
 	local classLabel = createText(dashboard, {
 		text = "Knight  Lv.1 / Job 1",
-		position = UDim2.fromOffset(8, 49),
-		size = UDim2.fromOffset(180, 12),
-		textSize = 10,
-		font = Enum.Font.Arial,
+		position = UDim2.fromOffset(10, 87),
+		size = UDim2.fromOffset(230, 13),
+		textSize = 11,
+		font = Enum.Font.Gotham,
 		textColor3 = TOKENS.body,
 	})
 
-	local barsCard = createPanel(dashboard, "BarsCard", UDim2.new(1, -8, 0, 41), UDim2.fromOffset(4, 66), TOKENS.panel, 6)
+	local barsCard = createPanel(dashboard, "BarsCard", UDim2.new(1, -8, 0, 42), UDim2.fromOffset(4, 102), TOKENS.panel, 6)
 	makeStroke(barsCard, TOKENS.lineSoft, 0.18, 1)
 	applyBevel(barsCard, 0.3, 0.6)
 
 	local _, hpFill, hpLabel = createCompactBar(barsCard, "HP", TOKENS.hp, UDim2.fromOffset(4, 4))
-	local _, spFill, spLabel = createCompactBar(barsCard, "SP", TOKENS.sp, UDim2.fromOffset(148, 4))
+	local _, spFill, spLabel = createCompactBar(barsCard, "SP", TOKENS.sp, UDim2.fromOffset(170, 4))
 	local _, expFill, expLabel = createCompactBar(barsCard, "EXP", TOKENS.exp, UDim2.fromOffset(4, 22))
-	local _, jexpFill, jexpLabel = createCompactBar(barsCard, "LV", TOKENS.jexp, UDim2.fromOffset(148, 22))
+	local _, jexpFill, jexpLabel = createCompactBar(barsCard, "LV", TOKENS.jexp, UDim2.fromOffset(170, 22))
 
 	local expandedSection = Instance.new("Frame")
 	expandedSection.Name = "ExpandedSection"
 	expandedSection.BackgroundTransparency = 1
-	expandedSection.Position = UDim2.fromOffset(4, 112)
+	expandedSection.Position = UDim2.fromOffset(4, 148)
 	expandedSection.Size = UDim2.new(1, -8, 0, 202)
 	expandedSection.Visible = false
 	expandedSection.Parent = dashboard
@@ -509,7 +529,7 @@ local function ensureGui()
 		position = UDim2.fromOffset(8, 3),
 		size = UDim2.fromOffset(56, 14),
 		textSize = 14,
-		font = Enum.Font.ArialBold,
+		font = Enum.Font.GothamBold,
 	})
 
 	createText(statsHeader, {
@@ -517,7 +537,7 @@ local function ensureGui()
 		position = UDim2.fromOffset(8, 16),
 		size = UDim2.fromOffset(90, 10),
 		textSize = 9,
-		font = Enum.Font.Arial,
+		font = Enum.Font.Gotham,
 		textColor3 = TOKENS.muted,
 	})
 
@@ -538,7 +558,7 @@ local function ensureGui()
 		position = UDim2.fromOffset(2, 1),
 		size = UDim2.fromOffset(60, 8),
 		textSize = 8,
-		font = Enum.Font.ArialBold,
+		font = Enum.Font.GothamBold,
 		textColor3 = TOKENS.muted,
 		textXAlignment = Enum.TextXAlignment.Center,
 	})
@@ -548,7 +568,7 @@ local function ensureGui()
 		position = UDim2.fromOffset(2, 7),
 		size = UDim2.fromOffset(60, 14),
 		textSize = 15,
-		font = Enum.Font.ArialBold,
+		font = Enum.Font.GothamBold,
 		textColor3 = TOKENS.button,
 		textXAlignment = Enum.TextXAlignment.Center,
 	})
@@ -622,7 +642,7 @@ local function ensureGui()
 	utilityFrame.Name = "UtilityButtons"
 	utilityFrame.BackgroundTransparency = 1
 	utilityFrame.Size = UDim2.fromOffset(118, 26)
-	utilityFrame.Position = UDim2.new(0, 306, 0, 12)
+	utilityFrame.Position = UDim2.new(0, 350, 0, 72)
 	utilityFrame.ZIndex = 5
 	utilityFrame.Parent = rootGui
 
