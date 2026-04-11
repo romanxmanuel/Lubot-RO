@@ -253,6 +253,25 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
             table.insert(profile.skillLoadout, starterSkillId)
         end
     end
+
+    local normalizedSkillLoadout = {}
+    local seenSkillId = {}
+    for _, skillId in ipairs(profile.skillLoadout) do
+        if SkillData[skillId] and not seenSkillId[skillId] then
+            seenSkillId[skillId] = true
+            table.insert(normalizedSkillLoadout, skillId)
+        end
+    end
+
+    for _, starterSkillId in ipairs(STARTER_SKILL_IDS) do
+        if SkillData[starterSkillId] and not seenSkillId[starterSkillId] then
+            seenSkillId[starterSkillId] = true
+            table.insert(normalizedSkillLoadout, starterSkillId)
+        end
+    end
+
+    profile.skillLoadout = normalizedSkillLoadout
+
     for _, starterSkillId in ipairs(STARTER_SKILL_IDS) do
         ensureSkill(profile.unlockedSkills, starterSkillId)
     end
@@ -262,39 +281,45 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
         destroyTools(player.Character)
     end
 
-    for _, skillId in ipairs(profile.skillLoadout) do
-        local skillDef = SkillData[skillId]
+    for _, skillId in ipairs(normalizedSkillLoadout) do
+        local castSkillId = skillId
+        local skillDef = SkillData[castSkillId]
         if skillDef then
-            local skillTool = ToolFactory.createSkillTool(skillId, skillDef, function()
-                dependencies.SkillService.useSkill(player, skillId)
+            local skillTool = ToolFactory.createSkillTool(castSkillId, skillDef, function()
+                dependencies.SkillService.useSkill(player, castSkillId)
             end)
             skillTool.Parent = backpack
         end
     end
 
     for _, entry in ipairs(profile.inventory) do
-        local itemDef = ItemData[entry.itemId]
-        if itemDef and entry.amount > 0 then
+        local entryItemId = entry.itemId
+        local entryAmount = entry.amount
+        local itemDef = ItemData[entryItemId]
+        if itemDef and entryAmount > 0 then
             if not shouldMaterializeInventoryTool(itemDef) then
                 continue
             end
             if itemDef.toolKind == 'consumable' then
-                local consumableTool = ToolFactory.createConsumableTool(entry.itemId, itemDef, entry.amount, function()
-                    InventoryServiceV2.consumeItem(player, entry.itemId, 1)
+                local consumableItemId = entryItemId
+                local consumableTool = ToolFactory.createConsumableTool(consumableItemId, itemDef, entryAmount, function()
+                    InventoryServiceV2.consumeItem(player, consumableItemId, 1)
                 end)
                 consumableTool.Parent = backpack
             elseif itemDef.toolKind == 'skin' then
-                local skinTool = ToolFactory.createSkinTool(entry.itemId, itemDef, function()
-                    dependencies.CharacterSkinService.applySkin(player, itemDef.skinTemplateId, itemDef.skinAssetId)
+                local skinTemplateId = itemDef.skinTemplateId
+                local skinAssetId = itemDef.skinAssetId
+                local skinTool = ToolFactory.createSkinTool(entryItemId, itemDef, function()
+                    dependencies.CharacterSkinService.applySkin(player, skinTemplateId, skinAssetId)
                 end)
                 skinTool.Parent = backpack
             elseif itemDef.toolKind == 'imported_tool' then
-                local importedTool = dependencies.ImportedAssetService.createToolClone(entry.itemId)
+                local importedTool = dependencies.ImportedAssetService.createToolClone(entryItemId)
                 if importedTool then
                     importedTool.Parent = backpack
                 end
             else
-                local itemTool = ToolFactory.createInventoryItemTool(entry.itemId, itemDef, entry.amount)
+                local itemTool = ToolFactory.createInventoryItemTool(entryItemId, itemDef, entryAmount)
                 itemTool.Parent = backpack
             end
         end

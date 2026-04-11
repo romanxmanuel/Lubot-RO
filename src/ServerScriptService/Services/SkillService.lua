@@ -36,6 +36,11 @@ function SkillService.useSkill(player: Player, skillId: string)
         return false
     end
 
+    local skillDef = SkillData[skillId]
+    if not skillDef then
+        return false
+    end
+
     local unlocked = false
     for _, unlockedSkillId in ipairs(profile.unlockedSkills) do
         if unlockedSkillId == skillId then
@@ -43,12 +48,14 @@ function SkillService.useSkill(player: Player, skillId: string)
             break
         end
     end
-    if not unlocked then
-        return false
+
+    -- Fallback for tool-driven skills: if the skill exists in the canonical SkillData table,
+    -- allow cast even when legacy profile reconciliation drops it from unlockedSkills.
+    if not unlocked and skillDef.toolKind == 'skill' then
+        unlocked = true
     end
 
-    local skillDef = SkillData[skillId]
-    if not skillDef then
+    if not unlocked then
         return false
     end
 
