@@ -3,8 +3,10 @@
 local Players = game:GetService('Players')
 local InsertService = game:GetService('InsertService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
+local Workspace = game:GetService('Workspace')
 
 local ItemData = require(ReplicatedStorage.GameData.Items.ItemData)
+local ImportedAssetData = require(ReplicatedStorage.GameData.ImportedAssets.ImportedAssetData)
 local MMONet = require(ReplicatedStorage.Shared.Net.MMONet)
 
 local CharacterSkinService = {
@@ -14,6 +16,7 @@ local CharacterSkinService = {
 local dependencies = nil
 local dynamicTemplateAssetIds: { [string]: number } = {}
 local templateItemIds: { [string]: string } = {}
+local importedAssetFolderByAssetId: { [number]: string } = {}
 
 local COSMETIC_CLASSES = {
     Accessory = true,
@@ -182,9 +185,13 @@ local function resolveSkinModelFromAsset(assetContainer: Instance): Model?
 end
 
 local function getWorkspaceAssetContainer(assetId: number): Instance?
-    local wanted = tostring(assetId)
+    for _, child in ipairs(Workspace:GetChildren()) do
+        local taggedId = tonumber(child:GetAttribute('ImportedAssetId'))
+        if taggedId and taggedId == assetId then
+            return child
+        end
 
-    for _, child in ipairs(workspace:GetChildren()) do
+        local wanted = tostring(assetId)
         if string.find(string.lower(child.Name), string.lower(wanted), 1, true) then
             return child
         end
@@ -260,6 +267,34 @@ local function loadTemplateFromCachedSource(templateId: string, itemId: string?,
     return cacheTemplateFromContainer(templateId, itemId, assetId, sourcePackage)
 end
 
+local function loadTemplateFromImportedAssetSource(templateId: string, itemId: string?, assetId: number): boolean
+    local gameParts = ReplicatedStorage:FindFirstChild('GameParts')
+    local importedAssets = gameParts and gameParts:FindFirstChild('ImportedAssets')
+    if not (importedAssets and importedAssets:IsA('Folder')) then
+        return false
+    end
+
+    local preferredFolderName = importedAssetFolderByAssetId[assetId]
+    if preferredFolderName and preferredFolderName ~= '' then
+        local preferredFolder = importedAssets:FindFirstChild(preferredFolderName)
+        local preferredSource = preferredFolder and preferredFolder:FindFirstChild('SourcePackage')
+        if preferredSource and cacheTemplateFromContainer(templateId, itemId, assetId, preferredSource) then
+            return true
+        end
+    end
+
+    for _, child in ipairs(importedAssets:GetChildren()) do
+        if child:IsA('Folder') then
+            local source = child:FindFirstChild('SourcePackage')
+            if source and cacheTemplateFromContainer(templateId, itemId, assetId, source) then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
 local function loadAssetContainer(assetId: number): Instance?
     local okInsert, loadedInsert = pcall(function()
         return InsertService:LoadAsset(assetId)
@@ -306,6 +341,10 @@ local function ensureDynamicTemplateLoaded(templateId: string, explicitAssetId: 
 
     local itemId = templateItemIds[templateId]
     if loadTemplateFromCachedSource(templateId, itemId, assetId) then
+        return
+    end
+
+    if loadTemplateFromImportedAssetSource(templateId, itemId, assetId) then
         return
     end
 
@@ -577,6 +616,9 @@ end
 
 function CharacterSkinService.init(deps)
     dependencies = deps
+    table.clear(dynamicTemplateAssetIds)
+    table.clear(templateItemIds)
+    table.clear(importedAssetFolderByAssetId)
 
     for _, itemDef in pairs(ItemData) do
         if itemDef.toolKind == 'skin'
@@ -585,6 +627,16 @@ function CharacterSkinService.init(deps)
         then
             dynamicTemplateAssetIds[itemDef.skinTemplateId] = itemDef.skinAssetId
             templateItemIds[itemDef.skinTemplateId] = itemDef.id
+        end
+    end
+
+    for _, assetDef in pairs(ImportedAssetData) do
+        if type(assetDef) == 'table' then
+            local assetId = tonumber(assetDef.assetId)
+            local folderName = assetDef.folderName
+            if assetId and type(folderName) == 'string' and folderName ~= '' then
+                importedAssetFolderByAssetId[assetId] = folderName
+            end
         end
     end
 end
