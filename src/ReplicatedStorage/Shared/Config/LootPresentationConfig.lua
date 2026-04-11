@@ -3,11 +3,17 @@
 local LootPresentationConfig = {
     PickupMaxDistance = 7,
     DespawnSeconds = 18,
-    BillboardMaxDistance = 78,
+    BillboardMaxDistance = 24,
     PromptActionText = 'Pick',
     PromptObjectText = '',
-    PromptHintMaxDistance = 12,
+    PromptHintMaxDistance = 8,
     AnnouncedRarities = {
+        Epic = true,
+        Legendary = true,
+        Mythic = true,
+    },
+    BillboardRarities = {
+        Rare = true,
         Epic = true,
         Legendary = true,
         Mythic = true,
@@ -115,6 +121,23 @@ function LootPresentationConfig.shouldAnnounceDrop(drop)
 
     local rarity = tostring(drop.rarity or 'Common')
     return LootPresentationConfig.AnnouncedRarities[rarity] == true
+end
+
+function LootPresentationConfig.shouldShowBillboard(drop)
+    if type(drop) ~= 'table' then
+        return false
+    end
+
+    if drop.kind == 'card' then
+        return true
+    end
+
+    if drop.chaseDrop == true then
+        return true
+    end
+
+    local rarity = tostring(drop.rarity or 'Common')
+    return LootPresentationConfig.BillboardRarities[rarity] == true
 end
 
 return LootPresentationConfig

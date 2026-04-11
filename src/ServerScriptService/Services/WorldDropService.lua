@@ -133,60 +133,16 @@ local function stylePickupPrompt(dropPart: BasePart, drop)
     local prompt = Instance.new('ProximityPrompt')
     prompt.Name = 'PickupPrompt'
     prompt.ActionText = LootPresentationConfig.PromptActionText or 'Loot'
-    prompt.ObjectText = LootPresentationConfig.PromptObjectText or ''
-    prompt.Style = Enum.ProximityPromptStyle.Custom
+    prompt.ObjectText = (LootPresentationConfig.PromptObjectText and LootPresentationConfig.PromptObjectText ~= '')
+        and LootPresentationConfig.PromptObjectText
+        or getDropDisplayName(drop)
+    prompt.Style = Enum.ProximityPromptStyle.Default
     prompt.KeyboardKeyCode = Enum.KeyCode.E
     prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
     prompt.HoldDuration = 0
     prompt.MaxActivationDistance = LootPresentationConfig.PickupMaxDistance
     prompt.RequiresLineOfSight = false
     prompt.Parent = dropPart
-
-    local hint = Instance.new('BillboardGui')
-    hint.Name = 'PickupHint'
-    hint.Size = UDim2.fromOffset(46, 18)
-    hint.StudsOffset = Vector3.new(1.1, 0.7, 0)
-    hint.AlwaysOnTop = true
-    hint.MaxDistance = LootPresentationConfig.PromptHintMaxDistance or (LootPresentationConfig.PickupMaxDistance + 6)
-    hint.Parent = dropPart
-
-    local backing = Instance.new('Frame')
-    backing.Size = UDim2.fromScale(1, 1)
-    backing.BackgroundColor3 = Color3.fromRGB(24, 28, 36)
-    backing.BackgroundTransparency = 0.22
-    backing.BorderSizePixel = 0
-    backing.Parent = hint
-
-    local corner = Instance.new('UICorner')
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = backing
-
-    local stroke = Instance.new('UIStroke')
-    stroke.Color = Color3.fromRGB(184, 192, 208)
-    stroke.Thickness = 1
-    stroke.Transparency = 0.45
-    stroke.Parent = backing
-
-    local keyLabel = Instance.new('TextLabel')
-    keyLabel.Size = UDim2.fromOffset(12, 12)
-    keyLabel.Position = UDim2.fromOffset(3, 3)
-    keyLabel.BackgroundTransparency = 1
-    keyLabel.Font = Enum.Font.GothamBold
-    keyLabel.TextSize = 8
-    keyLabel.TextColor3 = Color3.fromRGB(244, 246, 250)
-    keyLabel.Text = 'E'
-    keyLabel.Parent = backing
-
-    local actionLabel = Instance.new('TextLabel')
-    actionLabel.Size = UDim2.new(1, -26, 1, 0)
-    actionLabel.Position = UDim2.fromOffset(16, 0)
-    actionLabel.BackgroundTransparency = 1
-    actionLabel.Font = Enum.Font.GothamSemibold
-    actionLabel.TextSize = 7
-    actionLabel.TextColor3 = Color3.fromRGB(226, 231, 239)
-    actionLabel.TextXAlignment = Enum.TextXAlignment.Left
-    actionLabel.Text = LootPresentationConfig.PromptActionText or 'Pick'
-    actionLabel.Parent = backing
 
     return prompt
 end
@@ -275,10 +231,10 @@ local function createDropPart(runtimeId: string, drop, position: Vector3)
     local visual = LootPresentationConfig.getRarityVisual(drop.rarity)
     local itemType = getDropItemType(drop)
     local partSize = if itemType == 'Equipment'
-        then Vector3.new(1.45, 1.45, 1.45)
+        then Vector3.new(1.1, 1.1, 1.1)
         elseif itemType == 'Card'
-        then Vector3.new(1.3, 1.3, 1.3)
-        else Vector3.new(1.18, 1.18, 1.18)
+        then Vector3.new(0.95, 0.95, 0.95)
+        else Vector3.new(0.82, 0.82, 0.82)
     local groundedPosition = resolveGroundDropPosition(position, partSize)
 
     local dropPart = Instance.new('Part')
@@ -306,9 +262,15 @@ local function createDropPart(runtimeId: string, drop, position: Vector3)
     selectionBox.LineThickness = visual.lineThickness or if drop.rarity == 'Legendary' or drop.rarity == 'Mythic' then 0.03 else 0.018
     selectionBox.SurfaceTransparency = 1
     selectionBox.Transparency = visual.glowTransparency or 0.62
+    if not LootPresentationConfig.shouldShowBillboard(drop) then
+        selectionBox.Transparency = 0.92
+        selectionBox.LineThickness = 0.01
+    end
     selectionBox.Parent = dropPart
 
-    styleBillboard(dropPart, drop)
+    if LootPresentationConfig.shouldShowBillboard(drop) then
+        styleBillboard(dropPart, drop)
+    end
     styleDropSound(dropPart, drop)
 
     return dropPart, stylePickupPrompt(dropPart, drop), styleClickDetector(dropPart)
