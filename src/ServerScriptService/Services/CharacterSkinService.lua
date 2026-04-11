@@ -13,6 +13,7 @@ local CharacterSkinService = {
 
 local dependencies = nil
 local dynamicTemplateAssetIds: { [string]: number } = {}
+local templateItemIds: { [string]: string } = {}
 
 local COSMETIC_CLASSES = {
     Accessory = true,
@@ -115,6 +116,33 @@ local function ensurePlayerCharactersFolder(): Folder?
     return created
 end
 
+local function getImportedSkinCacheRoot(): Folder?
+    local gameParts = ReplicatedStorage:FindFirstChild('GameParts')
+    if not gameParts then
+        return nil
+    end
+
+    local importedAssets = gameParts:FindFirstChild('ImportedAssets')
+    if not (importedAssets and importedAssets:IsA('Folder')) then
+        importedAssets = Instance.new('Folder')
+        importedAssets.Name = 'ImportedAssets'
+        importedAssets.Parent = gameParts
+    end
+
+    local skinsFolder = importedAssets:FindFirstChild('Skins')
+    if not (skinsFolder and skinsFolder:IsA('Folder')) then
+        skinsFolder = Instance.new('Folder')
+        skinsFolder.Name = 'Skins'
+        skinsFolder.Parent = importedAssets
+    end
+
+    return skinsFolder :: Folder
+end
+
+local function sanitizeFolderName(rawName: string): string
+    return string.gsub(rawName, '[^%w_%-]', '_')
+end
+
 local function scoreModelCosmetics(model: Model): number
     local score = 0
     if model:FindFirstChildOfClass('Humanoid') then
@@ -153,6 +181,113 @@ local function resolveSkinModelFromAsset(assetContainer: Instance): Model?
     return bestModel
 end
 
+local function getWorkspaceAssetContainer(assetId: number): Instance?
+    local wanted = tostring(assetId)
+
+    for _, child in ipairs(workspace:GetChildren()) do
+        if string.find(string.lower(child.Name), string.lower(wanted), 1, true) then
+            return child
+        end
+    end
+
+    return nil
+end
+
+local function buildSkinFolderName(templateId: string, itemId: string?, assetId: number): string
+    if itemId and itemId ~= '' then
+        return sanitizeFolderName(string.format('%s_%d', itemId, assetId))
+    end
+    return sanitizeFolderName(string.format('%s_%d', templateId, assetId))
+end
+
+local function cacheTemplateFromContainer(templateId: string, itemId: string?, assetId: number, sourceContainer: Instance): boolean
+    local playerCharacters = ensurePlayerCharactersFolder()
+    local skinCacheRoot = getImportedSkinCacheRoot()
+    if not playerCharacters or not skinCacheRoot then
+        return false
+    end
+
+    local folderName = buildSkinFolderName(templateId, itemId, assetId)
+    local skinFolder = skinCacheRoot:FindFirstChild(folderName)
+    if not (skinFolder and skinFolder:IsA('Folder')) then
+        skinFolder = Instance.new('Folder')
+        skinFolder.Name = folderName
+        skinFolder.Parent = skinCacheRoot
+    end
+
+    local existingSource = skinFolder:FindFirstChild('SourcePackage')
+    if existingSource then
+        existingSource:Destroy()
+    end
+
+    local sourceClone = sourceContainer:Clone()
+    sourceClone.Name = 'SourcePackage'
+    sourceClone.Parent = skinFolder
+
+    local modelTemplate = resolveSkinModelFromAsset(sourceClone)
+    if not modelTemplate then
+        return false
+    end
+
+    local existingTemplate = playerCharacters:FindFirstChild(templateId)
+    if existingTemplate then
+        existingTemplate:Destroy()
+    end
+
+    local clone = modelTemplate:Clone()
+    clone.Name = templateId
+    clone.Parent = playerCharacters
+    return true
+end
+
+local function loadTemplateFromCachedSource(templateId: string, itemId: string?, assetId: number): boolean
+    local skinCacheRoot = getImportedSkinCacheRoot()
+    if not skinCacheRoot then
+        return false
+    end
+
+    local folderName = buildSkinFolderName(templateId, itemId, assetId)
+    local skinFolder = skinCacheRoot:FindFirstChild(folderName)
+    if not (skinFolder and skinFolder:IsA('Folder')) then
+        return false
+    end
+
+    local sourcePackage = skinFolder:FindFirstChild('SourcePackage')
+    if not sourcePackage then
+        return false
+    end
+
+    return cacheTemplateFromContainer(templateId, itemId, assetId, sourcePackage)
+end
+
+local function loadAssetContainer(assetId: number): Instance?
+    local okInsert, loadedInsert = pcall(function()
+        return InsertService:LoadAsset(assetId)
+    end)
+    if okInsert and loadedInsert then
+        return loadedInsert
+    end
+
+    local okObjects, loadedObjects = pcall(function()
+        return game:GetObjects(string.format('rbxassetid://%d', assetId))
+    end)
+    if okObjects and type(loadedObjects) == 'table' and #loadedObjects > 0 then
+        local firstInstance = loadedObjects[1]
+        if typeof(firstInstance) == 'Instance' then
+            return firstInstance
+        end
+    end
+
+    warn(string.format('[CharacterSkinService] Failed to load skin asset %d via InsertService and game:GetObjects.', assetId))
+    if not okInsert then
+        warn(string.format('[CharacterSkinService] InsertService error for %d: %s', assetId, tostring(loadedInsert)))
+    end
+    if not okObjects then
+        warn(string.format('[CharacterSkinService] game:GetObjects error for %d: %s', assetId, tostring(loadedObjects)))
+    end
+    return nil
+end
+
 local function ensureDynamicTemplateLoaded(templateId: string, explicitAssetId: number?)
     local playerCharacters = ensurePlayerCharactersFolder()
     if not playerCharacters then
@@ -169,24 +304,34 @@ local function ensureDynamicTemplateLoaded(templateId: string, explicitAssetId: 
         return
     end
 
-    local ok, loaded = pcall(function()
-        return InsertService:LoadAsset(assetId)
-    end)
-    if not ok or not loaded then
-        warn(string.format('[CharacterSkinService] Failed to load skin asset %d for template %s: %s', assetId, templateId, tostring(loaded)))
+    local itemId = templateItemIds[templateId]
+    if loadTemplateFromCachedSource(templateId, itemId, assetId) then
         return
     end
 
-    local modelTemplate = resolveSkinModelFromAsset(loaded)
-    if not modelTemplate then
-        warn(string.format('[CharacterSkinService] Skin asset %d did not contain a model with cosmetics for template %s.', assetId, templateId))
+    local workspaceContainer = getWorkspaceAssetContainer(assetId)
+    if workspaceContainer and cacheTemplateFromContainer(templateId, itemId, assetId, workspaceContainer) then
+        return
+    end
+
+    local loaded = loadAssetContainer(assetId)
+    if not loaded then
+        return
+    end
+
+    if cacheTemplateFromContainer(templateId, itemId, assetId, loaded) then
         loaded:Destroy()
         return
     end
 
-    local clone = modelTemplate:Clone()
-    clone.Name = templateId
-    clone.Parent = playerCharacters
+    local modelTemplate = resolveSkinModelFromAsset(loaded)
+    if modelTemplate then
+        local clone = modelTemplate:Clone()
+        clone.Name = templateId
+        clone.Parent = playerCharacters
+    else
+        warn(string.format('[CharacterSkinService] Skin asset %d did not contain a model with cosmetics for template %s.', assetId, templateId))
+    end
     loaded:Destroy()
 end
 
@@ -430,6 +575,7 @@ function CharacterSkinService.init(deps)
             and type(itemDef.skinAssetId) == 'number'
         then
             dynamicTemplateAssetIds[itemDef.skinTemplateId] = itemDef.skinAssetId
+            templateItemIds[itemDef.skinTemplateId] = itemDef.id
         end
     end
 end

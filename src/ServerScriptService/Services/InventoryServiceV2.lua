@@ -31,6 +31,45 @@ local function getInventoryEntry(profile, itemId: string)
     return nil
 end
 
+local function removeInventoryItem(profile, itemId: string)
+    for index = #profile.inventory, 1, -1 do
+        if profile.inventory[index].itemId == itemId then
+            table.remove(profile.inventory, index)
+        end
+    end
+end
+
+local function normalizeInventory(profile)
+    local mergedById = {}
+    local orderedIds = {}
+
+    for _, entry in ipairs(profile.inventory) do
+        local itemDef = ItemData[entry.itemId]
+        if itemDef then
+            local existing = mergedById[entry.itemId]
+            if existing then
+                if itemDef.stackable then
+                    existing.amount += math.max(1, entry.amount or 1)
+                else
+                    existing.amount = 1
+                end
+            else
+                local amount = itemDef.stackable and math.max(1, entry.amount or 1) or 1
+                mergedById[entry.itemId] = {
+                    itemId = entry.itemId,
+                    amount = amount,
+                }
+                table.insert(orderedIds, entry.itemId)
+            end
+        end
+    end
+
+    profile.inventory = {}
+    for _, itemId in ipairs(orderedIds) do
+        table.insert(profile.inventory, mergedById[itemId])
+    end
+end
+
 local function destroyTools(container: Instance?)
     if not container then
         return
@@ -129,12 +168,9 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
             potionEntry.amount = 1
         end
 
-        for index = #profile.inventory, 1, -1 do
-            local itemId = profile.inventory[index].itemId
-            if itemId == 'r6_combat_emblem' or itemId == 'gojo_skin' then
-                table.remove(profile.inventory, index)
-            end
-        end
+        removeInventoryItem(profile, 'r6_combat_emblem')
+        removeInventoryItem(profile, 'gojo_skin')
+        removeInventoryItem(profile, 'deku_skin')
 
         local styleEntry = getInventoryEntry(profile, 'deku_combat_emblem')
         if not styleEntry then
@@ -144,16 +180,6 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
             })
         elseif styleEntry.amount < 1 then
             styleEntry.amount = 1
-        end
-
-        local dekuSkinEntry = getInventoryEntry(profile, 'deku_skin')
-        if not dekuSkinEntry then
-            table.insert(profile.inventory, {
-                itemId = 'deku_skin',
-                amount = 1,
-            })
-        elseif dekuSkinEntry.amount < 1 then
-            dekuSkinEntry.amount = 1
         end
 
         local gojoWhiteSkinEntry = getInventoryEntry(profile, 'gojo_white_skin')
@@ -225,6 +251,8 @@ function InventoryServiceV2.ensureStarterLoadout(player: Player)
         elseif susanooSasukeSkinEntry.amount < 1 then
             susanooSasukeSkinEntry.amount = 1
         end
+
+        normalizeInventory(profile)
     end)
 end
 

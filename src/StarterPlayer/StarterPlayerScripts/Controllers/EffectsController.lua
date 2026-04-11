@@ -20,6 +20,7 @@ local GLOBAL_IMPACT_SCALE = 1.35
 local HIT_CAMERA_RADIUS = 36
 local makeEffectPart: ((Color3, Vector3, CFrame, Enum.PartType?, number) -> Part)?
 local tweenAndCleanup: ((Instance, TweenInfo, any) -> ())?
+local makeDashEmitter: ((Instance, number, number, Vector2, number, number, number, NumberSequence, NumberSequence, number, ColorSequence, number) -> ParticleEmitter)?
 
 local function getSkinBurstPalette(templateId: string?): (Color3, Color3)
     if templateId == 'DekuCharacterTemplate' then
@@ -613,7 +614,7 @@ function makeEffectPart(color: Color3, size: Vector3, cframe: CFrame, shape: Enu
     return part
 end
 
-local function makeDashEmitter(parent: Instance, speedMin: number, speedMax: number, spread: Vector2, drag: number, lifetimeMin: number, lifetimeMax: number, sizeSequence: NumberSequence, transparencySequence: NumberSequence, emission: number, color: ColorSequence, brightness: number)
+function makeDashEmitter(parent: Instance, speedMin: number, speedMax: number, spread: Vector2, drag: number, lifetimeMin: number, lifetimeMax: number, sizeSequence: NumberSequence, transparencySequence: NumberSequence, emission: number, color: ColorSequence, brightness: number)
     local emitter = Instance.new('ParticleEmitter')
     emitter.Texture = DASH_TEXTURE
     emitter.Color = color
