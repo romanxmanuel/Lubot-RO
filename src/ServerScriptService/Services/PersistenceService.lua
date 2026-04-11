@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local ClassData = require(ReplicatedStorage.GameData.Classes.KnightData)
+local SkillData = require(ReplicatedStorage.GameData.Skills.SkillData)
 local StatConfig = require(ReplicatedStorage.Shared.Config.StatConfig)
 local SkillLoadout = require(ReplicatedStorage.Shared.Skills.SkillLoadout)
 
@@ -90,6 +91,15 @@ local function reconcileProgression(profile)
         if skillDef and skillDef.id and not unlockedById[skillDef.id] then
             unlockedById[skillDef.id] = true
             table.insert(orderedUnlocked, skillDef.id)
+        end
+    end
+
+    -- Preserve additional combat skills defined in GameData.SkillData that can be earned
+    -- from imported marketplace pickups.
+    for _, skillId in ipairs(profile.unlockedSkills or {}) do
+        if type(skillId) == 'string' and SkillData[skillId] and not unlockedById[skillId] then
+            unlockedById[skillId] = true
+            table.insert(orderedUnlocked, skillId)
         end
     end
 

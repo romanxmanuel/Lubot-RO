@@ -349,4 +349,101 @@ return {
             },
         },
     },
+    gojo_blue_burst = {
+        phases = {
+            {
+                marker = 'Windup',
+                t = 0.0,
+                effect = 'GojoBlueBurst',
+                vfx = {
+                    mode = 'charge',
+                    duration = 0.18,
+                    width = 7,
+                    range = 8,
+                },
+            },
+            {
+                marker = 'Slash1',
+                t = 0.24,
+                effect = 'GojoBlueBurst',
+                vfx = {
+                    mode = 'projectile',
+                    duration = 0.3,
+                    width = 6,
+                    range = 30,
+                    spin = 1.9,
+                },
+                hitbox = {
+                    shape = 'cone',
+                    range = 30,
+                    dotThreshold = 0.74,
+                    maxTargets = 3,
+                    damageScale = 1,
+                },
+            },
+            {
+                marker = 'Recover',
+                t = 0.58,
+                effect = 'GojoBlueBurst',
+                vfx = {
+                    mode = 'impact',
+                    duration = 0.24,
+                    width = 8,
+                    range = 9,
+                },
+            },
+        },
+    },
+    hollow_purple_burst = {
+        phases = {
+            {
+                marker = 'Windup',
+                t = 0.0,
+                effect = 'HollowPurpleBurst',
+                vfx = {
+                    mode = 'charge',
+                    duration = 0.2,
+                    width = 10,
+                    range = 10,
+                },
+            },
+            {
+                marker = 'Slash1',
+                t = 0.28,
+                effect = 'HollowPurpleBurst',
+                vfx = {
+                    mode = 'projectile',
+                    duration = 0.34,
+                    width = 9,
+                    range = 34,
+                    spin = 1.5,
+                },
+                hitbox = {
+                    shape = 'cone',
+                    range = 34,
+                    dotThreshold = 0.56,
+                    maxTargets = 6,
+                    damageScale = 0.74,
+                },
+            },
+            {
+                marker = 'Slash2',
+                t = 0.52,
+                effect = 'HollowPurpleBurst',
+                vfx = {
+                    mode = 'impact',
+                    duration = 0.34,
+                    width = 14,
+                    range = 14,
+                },
+                hitbox = {
+                    shape = 'radial',
+                    range = 14,
+                    maxTargets = 8,
+                    damageScale = 0.26,
+                    allowRepeat = true,
+                },
+            },
+        },
+    },
 }

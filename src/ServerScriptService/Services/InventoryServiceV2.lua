@@ -70,6 +70,30 @@ local function normalizeInventory(profile)
     end
 end
 
+local function hasSkill(list, skillId: string): boolean
+    for _, existing in ipairs(list) do
+        if existing == skillId then
+            return true
+        end
+    end
+    return false
+end
+
+local function registerOwnedTool(player: Player, tool: Tool?)
+    if not tool then
+        return
+    end
+
+    tool:SetAttribute('InventoryOwnerUserId', player.UserId)
+
+    if dependencies
+        and dependencies.ImportedAssetService
+        and dependencies.ImportedAssetService.trackInventoryTool
+    then
+        dependencies.ImportedAssetService.trackInventoryTool(tool, player.UserId)
+    end
+end
+
 local function destroyTools(container: Instance?)
     if not container then
         return
@@ -316,6 +340,7 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
             local skillTool = ToolFactory.createSkillTool(castSkillId, skillDef, function()
                 dependencies.SkillService.useSkill(player, castSkillId)
             end)
+            registerOwnedTool(player, skillTool)
             skillTool.Parent = backpack
         end
     end
@@ -333,6 +358,7 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
                 local consumableTool = ToolFactory.createConsumableTool(consumableItemId, itemDef, entryAmount, function()
                     InventoryServiceV2.consumeItem(player, consumableItemId, 1)
                 end)
+                registerOwnedTool(player, consumableTool)
                 consumableTool.Parent = backpack
             elseif itemDef.toolKind == 'skin' then
                 local skinTemplateId = itemDef.skinTemplateId
@@ -340,14 +366,17 @@ function InventoryServiceV2.rebuildPlayerTools(player: Player)
                 local skinTool = ToolFactory.createSkinTool(entryItemId, itemDef, function()
                     dependencies.CharacterSkinService.applySkin(player, skinTemplateId, skinAssetId)
                 end)
+                registerOwnedTool(player, skinTool)
                 skinTool.Parent = backpack
             elseif itemDef.toolKind == 'imported_tool' then
                 local importedTool = dependencies.ImportedAssetService.createToolClone(entryItemId)
                 if importedTool then
+                    registerOwnedTool(player, importedTool)
                     importedTool.Parent = backpack
                 end
             else
                 local itemTool = ToolFactory.createInventoryItemTool(entryItemId, itemDef, entryAmount)
+                registerOwnedTool(player, itemTool)
                 itemTool.Parent = backpack
             end
         end
@@ -384,19 +413,98 @@ function InventoryServiceV2.consumeItem(player: Player, itemId: string, amount: 
 end
 
 function InventoryServiceV2.addItem(player: Player, itemId: string, amount: number)
+    local itemDef = ItemData[itemId]
+    local addAmount = math.max(1, math.floor(tonumber(amount) or 1))
+
     dependencies.PersistenceService.updateProfile(player, function(profile)
         local entry = getInventoryEntry(profile, itemId)
         if entry then
-            entry.amount += amount
+            if itemDef and itemDef.stackable == false then
+                entry.amount = 1
+            else
+                entry.amount += addAmount
+            end
         else
             table.insert(profile.inventory, {
                 itemId = itemId,
-                amount = amount,
+                amount = if itemDef and itemDef.stackable == false then 1 else addAmount,
             })
         end
     end)
 
     InventoryServiceV2.rebuildPlayerTools(player)
+end
+
+function InventoryServiceV2.removeItem(player: Player, itemId: string, amount: number): boolean
+    local removed = false
+    local targetAmount = math.max(1, math.floor(tonumber(amount) or 1))
+
+    dependencies.PersistenceService.updateProfile(player, function(profile)
+        for index = #profile.inventory, 1, -1 do
+            local entry = profile.inventory[index]
+            if entry.itemId == itemId then
+                if entry.amount <= targetAmount then
+                    table.remove(profile.inventory, index)
+                else
+                    entry.amount -= targetAmount
+                end
+                removed = true
+                break
+            end
+        end
+    end)
+
+    if removed then
+        InventoryServiceV2.rebuildPlayerTools(player)
+    end
+    return removed
+end
+
+function InventoryServiceV2.grantSkill(player: Player, skillId: string): boolean
+    if not SkillData[skillId] then
+        return false
+    end
+
+    local changed = false
+    dependencies.PersistenceService.updateProfile(player, function(profile)
+        if not hasSkill(profile.unlockedSkills, skillId) then
+            table.insert(profile.unlockedSkills, skillId)
+            changed = true
+        end
+        if not hasSkill(profile.skillLoadout, skillId) then
+            table.insert(profile.skillLoadout, skillId)
+            changed = true
+        end
+    end)
+
+    if changed then
+        InventoryServiceV2.rebuildPlayerTools(player)
+    end
+    return changed
+end
+
+function InventoryServiceV2.removeSkill(player: Player, skillId: string): boolean
+    local removed = false
+
+    dependencies.PersistenceService.updateProfile(player, function(profile)
+        for index = #profile.skillLoadout, 1, -1 do
+            if profile.skillLoadout[index] == skillId then
+                table.remove(profile.skillLoadout, index)
+                removed = true
+            end
+        end
+        for index = #profile.unlockedSkills, 1, -1 do
+            if profile.unlockedSkills[index] == skillId then
+                table.remove(profile.unlockedSkills, index)
+                removed = true
+            end
+        end
+    end)
+
+    if removed then
+        InventoryServiceV2.rebuildPlayerTools(player)
+    end
+    return removed
 end
 
 function InventoryServiceV2.toggleInventoryToolStash(player: Player)

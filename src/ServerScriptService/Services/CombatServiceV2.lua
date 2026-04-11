@@ -55,6 +55,18 @@ local SKILL_BEHAVIOR = {
         dotThreshold = 0.05,
         maxTargets = 6,
     },
+    gojo_blue_burst = {
+        effect = MMONet.Effects.GojoBlueBurst,
+        shape = 'cone',
+        dotThreshold = 0.72,
+        maxTargets = 3,
+    },
+    hollow_purple_burst = {
+        effect = MMONet.Effects.HollowPurpleBurst,
+        shape = 'cone',
+        dotThreshold = 0.56,
+        maxTargets = 6,
+    },
 }
 
 local function getForwardVector(player: Player)

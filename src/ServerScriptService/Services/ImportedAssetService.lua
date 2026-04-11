@@ -1,20 +1,33 @@
 --!strict
 
+local InsertService = game:GetService('InsertService')
+local Players = game:GetService('Players')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local Workspace = game:GetService('Workspace')
 
 local ImportedAssetData = require(ReplicatedStorage.GameData.ImportedAssets.ImportedAssetData)
 local ItemData = require(ReplicatedStorage.GameData.Items.ItemData)
+local SkillData = require(ReplicatedStorage.GameData.Skills.SkillData)
 
 local ImportedAssetService = {
     Name = 'ImportedAssetService',
 }
 
 local dependencies = nil
+local assetDefsSorted = {}
+local assetDefByItemId: { [string]: any } = {}
+local dropWatcherConnection: RBXScriptConnection? = nil
+local trackedToolConnections: { [Tool]: RBXScriptConnection } = {}
 
-local function getGameParts(): Instance?
-    return ReplicatedStorage:FindFirstChild('GameParts')
-end
+local SOURCE_PACKAGE_NAME = 'SourcePackage'
+local TOOL_TEMPLATE_NAME = 'ToolTemplate'
+local STATIC_PICKUP_FOLDER_NAME = 'ImportedAssetPickups'
+local RUNTIME_DROP_FOLDER_NAME = 'DroppedInventoryPickups'
+local DEFAULT_PICKUP_BASE_CFRAME = CFrame.new(-281.5, 6.35, 268.25)
+local DEFAULT_PICKUP_COLUMNS = 5
+local DEFAULT_PICKUP_SPACING_X = 6.2
+local DEFAULT_PICKUP_SPACING_Z = 6.2
+local DROP_PICKUP_LIFETIME = 120
 
 local function ensureFolder(parent: Instance, name: string): Folder
     local existing = parent:FindFirstChild(name)
@@ -22,10 +35,28 @@ local function ensureFolder(parent: Instance, name: string): Folder
         return existing
     end
 
-    local folder = Instance.new('Folder')
-    folder.Name = name
-    folder.Parent = parent
-    return folder
+    if existing then
+        existing:Destroy()
+    end
+
+    local created = Instance.new('Folder')
+    created.Name = name
+    created.Parent = parent
+    return created
+end
+
+local function clearChildren(parent: Instance)
+    for _, child in ipairs(parent:GetChildren()) do
+        child:Destroy()
+    end
+end
+
+local function getGameParts(): Folder?
+    local gameParts = ReplicatedStorage:FindFirstChild('GameParts')
+    if gameParts and gameParts:IsA('Folder') then
+        return gameParts
+    end
+    return nil
 end
 
 local function getImportedRoot(): Folder?
@@ -33,63 +64,283 @@ local function getImportedRoot(): Folder?
     if not gameParts then
         return nil
     end
-    local importedRoot = gameParts:FindFirstChild('ImportedAssets')
-    if importedRoot and importedRoot:IsA('Folder') then
-        return importedRoot
-    end
-    return nil
+    return ensureFolder(gameParts, 'ImportedAssets')
 end
 
-local function getAssetFolderByItemId(itemId: string): Folder?
+local function getAssetFolder(assetDef): Folder?
     local importedRoot = getImportedRoot()
     if not importedRoot then
         return nil
     end
+    return ensureFolder(importedRoot, assetDef.folderName)
+end
 
-    for _, assetDef in pairs(ImportedAssetData) do
-        if assetDef.itemId == itemId then
-            local folder = importedRoot:FindFirstChild(assetDef.folderName)
-            if folder and folder:IsA('Folder') then
-                return folder
-            end
+local function getStaticPickupFolder(): Folder?
+    local maps = Workspace:FindFirstChild('Maps')
+    local zoltraak = maps and maps:FindFirstChild('Zoltraak')
+    local playerUse = zoltraak and zoltraak:FindFirstChild('PlayerUse')
+    if not (playerUse and playerUse:IsA('Folder')) then
+        return nil
+    end
+    return ensureFolder(playerUse, STATIC_PICKUP_FOLDER_NAME)
+end
+
+local function getRuntimeDropFolder(): Folder
+    local spawnedDuringPlay = Workspace:FindFirstChild('SpawnedDuringPlay')
+    if not (spawnedDuringPlay and spawnedDuringPlay:IsA('Folder')) then
+        spawnedDuringPlay = Instance.new('Folder')
+        spawnedDuringPlay.Name = 'SpawnedDuringPlay'
+        spawnedDuringPlay.Parent = Workspace
+    end
+    return ensureFolder(spawnedDuringPlay, RUNTIME_DROP_FOLDER_NAME)
+end
+
+local function collectBaseParts(root: Instance): { BasePart }
+    local parts = {}
+    if root:IsA('BasePart') then
+        table.insert(parts, root)
+    end
+    for _, descendant in ipairs(root:GetDescendants()) do
+        if descendant:IsA('BasePart') then
+            table.insert(parts, descendant)
         end
     end
+    return parts
+end
 
+local function getFirstBasePart(root: Instance): BasePart?
+    if root:IsA('BasePart') then
+        return root
+    end
+    for _, descendant in ipairs(root:GetDescendants()) do
+        if descendant:IsA('BasePart') then
+            return descendant
+        end
+    end
     return nil
 end
 
-local function getTemplateTool(itemId: string): Tool?
-    local assetFolder = getAssetFolderByItemId(itemId)
+local function placeInstanceAtCFrame(root: Instance, targetCFrame: CFrame): boolean
+    if root:IsA('Model') then
+        root:PivotTo(targetCFrame)
+        return true
+    end
+
+    if root:IsA('BasePart') then
+        root.CFrame = targetCFrame
+        return true
+    end
+
+    local anchorPart = getFirstBasePart(root)
+    if not anchorPart then
+        return false
+    end
+
+    local transform = targetCFrame * anchorPart.CFrame:Inverse()
+    for _, part in ipairs(collectBaseParts(root)) do
+        part.CFrame = transform * part.CFrame
+    end
+    return true
+end
+
+local function configureDisplayPhysics(displayRoot: Instance)
+    for _, part in ipairs(collectBaseParts(displayRoot)) do
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanTouch = false
+        part.CanQuery = false
+        part.Massless = true
+    end
+end
+
+local function disableDisplayScripts(displayRoot: Instance)
+    if displayRoot:IsA('Script') or displayRoot:IsA('LocalScript') then
+        displayRoot.Disabled = true
+    end
+
+    for _, descendant in ipairs(displayRoot:GetDescendants()) do
+        if descendant:IsA('Script') or descendant:IsA('LocalScript') then
+            descendant.Disabled = true
+        end
+    end
+end
+
+local function classifyAssetContainer(root: Instance): string
+    local hasTool = root:IsA('Tool')
+    local hasHumanoid = false
+    local hasParticleOrBeam = false
+    local hasAnimation = false
+    local hasScript = root:IsA('Script') or root:IsA('LocalScript') or root:IsA('ModuleScript')
+
+    for _, descendant in ipairs(root:GetDescendants()) do
+        if descendant:IsA('Tool') then
+            hasTool = true
+        elseif descendant:IsA('Humanoid') then
+            hasHumanoid = true
+        elseif descendant:IsA('ParticleEmitter') or descendant:IsA('Beam') or descendant:IsA('Trail') then
+            hasParticleOrBeam = true
+        elseif descendant:IsA('Animation') then
+            hasAnimation = true
+        elseif descendant:IsA('Script') or descendant:IsA('LocalScript') or descendant:IsA('ModuleScript') then
+            hasScript = true
+        end
+    end
+
+    if hasTool then
+        return 'tool'
+    end
+    if hasHumanoid then
+        return 'character_model'
+    end
+    if hasParticleOrBeam or hasAnimation then
+        return 'vfx_or_skill_pack'
+    end
+    if hasScript then
+        return 'script'
+    end
+    return 'model_or_unknown'
+end
+
+local function findToolCandidate(root: Instance): Tool?
+    if root:IsA('Tool') then
+        return root
+    end
+
+    for _, descendant in ipairs(root:GetDescendants()) do
+        if descendant:IsA('Tool') then
+            return descendant
+        end
+    end
+    return nil
+end
+
+local function loadAssetContainer(assetId: number): Instance?
+    local okInsert, loadedInsert = pcall(function()
+        return InsertService:LoadAsset(assetId)
+    end)
+    if okInsert and loadedInsert then
+        return loadedInsert
+    end
+    warn(string.format('[ImportedAssetService] Failed to load asset %d with InsertService: %s', assetId, tostring(loadedInsert)))
+    return nil
+end
+
+local function sourceHasContent(source: Instance?): boolean
+    if not source then
+        return false
+    end
+
+    if #source:GetChildren() > 0 then
+        return true
+    end
+
+    return #source:GetDescendants() > 0
+end
+
+local function ensureToolTemplate(assetDef, assetFolder: Folder, source: Instance)
+    local itemDef = assetDef.itemId and ItemData[assetDef.itemId]
+    if not itemDef or itemDef.toolKind ~= 'imported_tool' then
+        return
+    end
+
+    local existing = assetFolder:FindFirstChild(TOOL_TEMPLATE_NAME)
+    if existing and existing:IsA('Tool') then
+        existing:SetAttribute('ImportedAssetId', assetDef.assetId)
+        existing:SetAttribute('ItemId', assetDef.itemId)
+        return
+    end
+    if existing then
+        existing:Destroy()
+    end
+
+    local template: Tool
+    local toolCandidate = findToolCandidate(source)
+    if toolCandidate then
+        template = toolCandidate:Clone()
+    else
+        template = Instance.new('Tool')
+        template.RequiresHandle = true
+        template.ToolTip = itemDef.description or itemDef.displayName
+        template.CanBeDropped = true
+        template.Name = itemDef.displayName or assetDef.displayName
+
+        local handleSource = getFirstBasePart(source)
+        local handle = if handleSource then handleSource:Clone() else Instance.new('Part')
+        handle.Name = 'Handle'
+        handle.Size = if handle:IsA('BasePart') then handle.Size else Vector3.new(1, 1, 1)
+        handle.Anchored = false
+        handle.CanCollide = false
+        handle.CanTouch = false
+        handle.CanQuery = false
+        handle.Massless = true
+        handle.Parent = template
+
+        local payload = source:Clone()
+        payload.Name = 'SourcePayload'
+        payload.Parent = template
+    end
+
+    template.Name = TOOL_TEMPLATE_NAME
+    template:SetAttribute('ImportedAssetId', assetDef.assetId)
+    template:SetAttribute('ItemId', assetDef.itemId)
+    template.Parent = assetFolder
+end
+
+local function ensureSourcePackage(assetDef): Instance?
+    local assetFolder = getAssetFolder(assetDef)
     if not assetFolder then
         return nil
     end
 
-    local template = assetFolder:FindFirstChild('ToolTemplate')
+    local source = assetFolder:FindFirstChild(SOURCE_PACKAGE_NAME)
+    if sourceHasContent(source) then
+        ensureToolTemplate(assetDef, assetFolder, source :: Instance)
+        return source
+    end
+    if source then
+        source:Destroy()
+    end
+
+    local loaded = loadAssetContainer(assetDef.assetId)
+    if not loaded then
+        warn(string.format('[ImportedAssetService] Could not load asset %d (%s).', assetDef.assetId, tostring(assetDef.displayName)))
+        return nil
+    end
+
+    loaded.Name = SOURCE_PACKAGE_NAME
+    loaded:SetAttribute('ImportedAssetId', assetDef.assetId)
+    loaded:SetAttribute('ExpectedType', assetDef.expectedType or '')
+    local detectedType = classifyAssetContainer(loaded)
+    loaded:SetAttribute('DetectedType', detectedType)
+    loaded.Parent = assetFolder
+
+    print(string.format(
+        '[ImportedAssetService] Classified asset %d (%s) as %s (expected: %s).',
+        assetDef.assetId,
+        tostring(assetDef.displayName or assetDef.id),
+        detectedType,
+        tostring(assetDef.expectedType or 'n/a')
+    ))
+
+    ensureToolTemplate(assetDef, assetFolder, loaded)
+    return loaded
+end
+
+local function getTemplateTool(assetDef): Tool?
+    local assetFolder = getAssetFolder(assetDef)
+    if not assetFolder then
+        return nil
+    end
+
+    local template = assetFolder:FindFirstChild(TOOL_TEMPLATE_NAME)
     if template and template:IsA('Tool') then
         return template
     end
-
     return nil
-end
-
-local function getPickupFolder(): Folder?
-    local maps = Workspace:FindFirstChild('Maps')
-    local zoltraak = maps and maps:FindFirstChild('Zoltraak')
-    local playerUse = zoltraak and zoltraak:FindFirstChild('PlayerUse')
-    if not playerUse then
-        return nil
-    end
-    return ensureFolder(playerUse, 'ImportedAssetPickups')
-end
-
-local function grantImportedItem(player: Player, itemId: string)
-    dependencies.InventoryService.addItem(player, itemId, 1)
-    dependencies.Runtime.SystemMessage:FireClient(player, 'Imported item acquired: ' .. itemId)
 end
 
 local function configureImportedLocalScriptActivation(tool: Tool)
     local localScriptStates: { [LocalScript]: boolean } = {}
-
     for _, descendant in ipairs(tool:GetDescendants()) do
         if descendant:IsA('LocalScript') then
             localScriptStates[descendant] = descendant.Enabled
@@ -109,172 +360,445 @@ local function configureImportedLocalScriptActivation(tool: Tool)
         end
     end
 
-    setEnabled(false)
-
     tool.Equipped:Connect(function()
         setEnabled(true)
     end)
-
     tool.Unequipped:Connect(function()
         setEnabled(false)
     end)
-
     tool.AncestryChanged:Connect(function()
         if tool.Parent and tool.Parent:IsA('Backpack') then
             setEnabled(false)
         end
     end)
+
+    setEnabled(false)
 end
 
-local function createPickupModel(assetDef, itemDef): Model
-    local model = Instance.new('Model')
-    model.Name = assetDef.pickupName
+local function getDisplayName(assetDef): string
+    if assetDef.grantType == 'item' and assetDef.itemId then
+        local itemDef = ItemData[assetDef.itemId]
+        if itemDef and itemDef.displayName then
+            return itemDef.displayName
+        end
+    elseif assetDef.grantType == 'skill' and assetDef.skillId then
+        local skillDef = SkillData[assetDef.skillId]
+        if skillDef and skillDef.displayName then
+            return skillDef.displayName
+        end
+    end
+    return assetDef.displayName or tostring(assetDef.id)
+end
+
+local function getPickupPrompt(assetDef): string
+    if assetDef.pickupPrompt and assetDef.pickupPrompt ~= '' then
+        return assetDef.pickupPrompt
+    end
+
+    if assetDef.grantType == 'skill' then
+        return 'Learn ' .. getDisplayName(assetDef)
+    end
+    return 'Take ' .. getDisplayName(assetDef)
+end
+
+local function resolvePickupCFrame(assetDef, orderedIndex: number): CFrame
+    if typeof(assetDef.pickupCFrame) == 'CFrame' then
+        return assetDef.pickupCFrame
+    end
+
+    local index = math.max(1, tonumber(assetDef.spawnIndex) or orderedIndex)
+    local offsetIndex = index - 1
+    local row = math.floor(offsetIndex / DEFAULT_PICKUP_COLUMNS)
+    local col = offsetIndex % DEFAULT_PICKUP_COLUMNS
+    return DEFAULT_PICKUP_BASE_CFRAME * CFrame.new(col * DEFAULT_PICKUP_SPACING_X, 0, row * DEFAULT_PICKUP_SPACING_Z)
+end
+
+local function createFallbackVisual(parent: Instance, color: Color3)
+    local orb = Instance.new('Part')
+    orb.Name = 'FallbackVisual'
+    orb.Shape = Enum.PartType.Ball
+    orb.Size = Vector3.new(1.9, 1.9, 1.9)
+    orb.Material = Enum.Material.Neon
+    orb.Color = color
+    orb.Anchored = true
+    orb.CanCollide = false
+    orb.CanTouch = false
+    orb.CanQuery = false
+    orb.Parent = parent
+    return orb
+end
+
+local function spawnPickupModel(displaySource: Instance?, assetDef, grantPayload, targetCFrame: CFrame, parent: Instance, respawnOnPickup: boolean)
+    local pickupModel = Instance.new('Model')
+    pickupModel.Name = assetDef.pickupName or string.format('ImportedPickup_%s', tostring(assetDef.id))
+    pickupModel:SetAttribute('ImportedPickup', true)
+    pickupModel:SetAttribute('ImportedAssetId', assetDef.assetId)
+    pickupModel:SetAttribute('GrantType', grantPayload.grantType)
+    if grantPayload.itemId then
+        pickupModel:SetAttribute('GrantItemId', grantPayload.itemId)
+    end
+    if grantPayload.skillId then
+        pickupModel:SetAttribute('GrantSkillId', grantPayload.skillId)
+    end
+    if grantPayload.amount then
+        pickupModel:SetAttribute('GrantAmount', tonumber(grantPayload.amount) or 1)
+    end
 
     local root = Instance.new('Part')
     root.Name = 'PickupRoot'
+    root.Size = Vector3.new(3, 3.8, 3)
+    root.Transparency = 1
     root.Anchored = true
     root.CanCollide = false
-    root.Transparency = 1
-    root.Size = Vector3.new(4, 5, 4)
-    root.Parent = model
-    model.PrimaryPart = root
+    root.CanTouch = false
+    root.CanQuery = false
+    root.CFrame = targetCFrame
+    root.Parent = pickupModel
+    pickupModel.PrimaryPart = root
 
-    local pedestal = Instance.new('Part')
-    pedestal.Name = 'Pedestal'
-    pedestal.Anchored = true
-    pedestal.CanCollide = true
-    pedestal.Material = Enum.Material.Slate
-    pedestal.Color = Color3.fromRGB(67, 76, 92)
-    pedestal.Size = Vector3.new(4.6, 1.1, 4.6)
-    pedestal.Parent = model
+    local displayPlaced = false
+    if displaySource then
+        local displayClone = displaySource:Clone()
+        displayClone.Name = 'Display'
+        displayClone.Parent = pickupModel
+        disableDisplayScripts(displayClone)
+        configureDisplayPhysics(displayClone)
+        displayPlaced = placeInstanceAtCFrame(displayClone, targetCFrame * CFrame.new(0, 1.1, 0))
+    end
 
-    local rune = Instance.new('Part')
-    rune.Name = 'Rune'
-    rune.Anchored = true
-    rune.CanCollide = false
-    rune.Shape = Enum.PartType.Cylinder
-    rune.Material = Enum.Material.Neon
-    rune.Color = itemDef.accentColor or Color3.fromRGB(255, 142, 84)
-    rune.Transparency = 0.12
-    rune.Size = Vector3.new(0.14, 4.9, 4.9)
-    rune.Parent = model
-
-    local previewTool = getTemplateTool(assetDef.itemId)
-    local previewHandle = previewTool and previewTool:FindFirstChild('Handle')
-    if previewHandle and previewHandle:IsA('BasePart') then
-        local display = previewHandle:Clone()
-        display.Name = 'DisplayHandle'
-        display.Anchored = true
-        display.CanCollide = false
-        for _, descendant in ipairs(display:GetDescendants()) do
-            if descendant:IsA('Script') or descendant:IsA('LocalScript') or descendant:IsA('ModuleScript') then
-                descendant:Destroy()
-            end
-        end
-        display.Parent = model
+    if not displayPlaced then
+        local fallback = createFallbackVisual(pickupModel, Color3.fromRGB(162, 206, 255))
+        fallback.CFrame = targetCFrame * CFrame.new(0, 1.1, 0)
     end
 
     local prompt = Instance.new('ProximityPrompt')
     prompt.Name = 'PickupPrompt'
     prompt.ActionText = 'Pick Up'
-    prompt.ObjectText = assetDef.pickupPrompt
+    prompt.ObjectText = getPickupPrompt(assetDef)
     prompt.KeyboardKeyCode = Enum.KeyCode.E
     prompt.HoldDuration = 0
     prompt.RequiresLineOfSight = false
-    prompt.MaxActivationDistance = 12
+    prompt.MaxActivationDistance = 14
     prompt.Parent = root
 
-    prompt.Triggered:Connect(function(player)
-        grantImportedItem(player, assetDef.itemId)
-    end)
-
-    local billboard = Instance.new('BillboardGui')
-    billboard.Name = 'PickupLabel'
-    billboard.AlwaysOnTop = true
-    billboard.MaxDistance = 34
-    billboard.Size = UDim2.fromOffset(210, 50)
-    billboard.StudsOffset = Vector3.new(0, 6.8, 0)
-    billboard.Parent = root
+    local label = Instance.new('BillboardGui')
+    label.Name = 'PickupLabel'
+    label.Size = UDim2.fromOffset(230, 54)
+    label.StudsOffset = Vector3.new(0, 4.8, 0)
+    label.AlwaysOnTop = true
+    label.MaxDistance = 48
+    label.Parent = root
 
     local frame = Instance.new('Frame')
     frame.Size = UDim2.fromScale(1, 1)
-    frame.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-    frame.BackgroundTransparency = 0.18
+    frame.BackgroundColor3 = Color3.fromRGB(16, 20, 30)
+    frame.BackgroundTransparency = 0.2
     frame.BorderSizePixel = 0
-    frame.Parent = billboard
+    frame.Parent = label
 
     local corner = Instance.new('UICorner')
-    corner.CornerRadius = UDim.new(0, 10)
+    corner.CornerRadius = UDim.new(0, 9)
     corner.Parent = frame
 
     local stroke = Instance.new('UIStroke')
-    stroke.Color = itemDef.accentColor or Color3.fromRGB(255, 142, 84)
-    stroke.Thickness = 1.1
-    stroke.Transparency = 0.12
+    stroke.Thickness = 1.2
+    stroke.Transparency = 0.14
+    stroke.Color = Color3.fromRGB(176, 214, 255)
     stroke.Parent = frame
 
-    local label = Instance.new('TextLabel')
-    label.BackgroundTransparency = 1
-    label.Size = UDim2.fromScale(1, 1)
-    label.Font = Enum.Font.GothamBold
-    label.Text = itemDef.displayName
-    label.TextSize = 15
-    label.TextColor3 = Color3.fromRGB(255, 246, 226)
-    label.Parent = frame
+    local text = Instance.new('TextLabel')
+    text.BackgroundTransparency = 1
+    text.Size = UDim2.fromScale(1, 1)
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 14
+    text.TextColor3 = Color3.fromRGB(248, 252, 255)
+    text.Text = getDisplayName(assetDef)
+    text.Parent = frame
 
-    return model
+    local claimed = false
+    prompt.Triggered:Connect(function(player)
+        if claimed then
+            return
+        end
+        claimed = true
+
+        local success, message = ImportedAssetService.grantAsset(player, grantPayload)
+        if not success then
+            claimed = false
+            if message and message ~= '' then
+                dependencies.Runtime.SystemMessage:FireClient(player, message)
+            end
+            return
+        end
+
+        pickupModel:Destroy()
+        if respawnOnPickup then
+            task.delay(1.8, function()
+                if parent.Parent == nil then
+                    return
+                end
+                spawnPickupModel(displaySource, assetDef, grantPayload, targetCFrame, parent, true)
+            end)
+        end
+    end)
+
+    pickupModel.Parent = parent
+    if not respawnOnPickup then
+        task.delay(DROP_PICKUP_LIFETIME, function()
+            if pickupModel.Parent then
+                pickupModel:Destroy()
+            end
+        end)
+    end
+    return pickupModel
 end
 
-local function positionPickupModel(model: Model, cframe: CFrame)
-    local root = model.PrimaryPart
-    if not root then
+local function getPickupDisplaySource(assetDef): Instance?
+    local source = ensureSourcePackage(assetDef)
+    if source then
+        return source
+    end
+    return nil
+end
+
+local function resolveItemDropAmount(tool: Tool): number
+    local amountAttr = tonumber(tool:GetAttribute('Amount'))
+    if amountAttr and amountAttr >= 1 then
+        return math.floor(amountAttr)
+    end
+    return 1
+end
+
+local function getToolWorldCFrame(tool: Tool): CFrame?
+    local handle = tool:FindFirstChild('Handle')
+    if handle and handle:IsA('BasePart') then
+        return handle.CFrame
+    end
+
+    local firstPart = getFirstBasePart(tool)
+    if firstPart then
+        return firstPart.CFrame
+    end
+    return nil
+end
+
+local function findAssetDefByItemId(itemId: string?)
+    if not itemId then
+        return nil
+    end
+    return assetDefByItemId[itemId]
+end
+
+local function findAssetDefBySkillId(skillId: string?)
+    for _, assetDef in ipairs(assetDefsSorted) do
+        if assetDef.grantType == 'skill' and assetDef.skillId == skillId then
+            return assetDef
+        end
+    end
+    return nil
+end
+
+local function spawnDroppedToolPickup(tool: Tool, itemId: string?, skillId: string?)
+    local dropFolder = getRuntimeDropFolder()
+    local toolCFrame = getToolWorldCFrame(tool)
+    if not toolCFrame then
         return
     end
 
-    root.CFrame = cframe
+    local fallbackDef = {
+        id = string.format('runtime_drop_%d', math.floor(os.clock() * 1000)),
+        assetId = tonumber(tool:GetAttribute('ImportedAssetId')) or 0,
+        displayName = tool.Name,
+        pickupName = string.format('Dropped_%s', tool.Name),
+        pickupPrompt = string.format('Take %s', tool.Name),
+    }
 
-    local pedestal = model:FindFirstChild('Pedestal')
-    if pedestal and pedestal:IsA('BasePart') then
-        pedestal.CFrame = cframe * CFrame.new(0, -2.2, 0)
+    local grantPayload = {
+        grantType = if skillId and skillId ~= '' then 'skill' else 'item',
+        itemId = itemId,
+        skillId = skillId,
+        amount = resolveItemDropAmount(tool),
+    }
+
+    local assetDef = if grantPayload.grantType == 'item'
+        then findAssetDefByItemId(itemId)
+        else findAssetDefBySkillId(skillId)
+
+    local displaySource: Instance = tool
+    local pickupDef = assetDef or fallbackDef
+
+    spawnPickupModel(
+        displaySource,
+        pickupDef,
+        grantPayload,
+        CFrame.new(toolCFrame.Position),
+        dropFolder,
+        false
+    )
+end
+
+local function processDroppedTool(tool: Tool)
+    if tool.Parent ~= Workspace then
+        return
     end
 
-    local rune = model:FindFirstChild('Rune')
-    if rune and rune:IsA('BasePart') then
-        rune.CFrame = cframe * CFrame.new(0, -2.66, 0) * CFrame.Angles(0, 0, math.rad(90))
+    if tool:GetAttribute('DropProcessed') == true then
+        return
     end
 
-    local display = model:FindFirstChild('DisplayHandle')
-    if display and display:IsA('BasePart') then
-        display.CFrame = cframe * CFrame.new(0, 0.2, 0) * CFrame.Angles(math.rad(-8), math.rad(25), math.rad(90))
+    if tool:GetAttribute('ImportedPickupDisplay') == true then
+        return
     end
+
+    local ownerUserId = tonumber(tool:GetAttribute('InventoryOwnerUserId'))
+    if not ownerUserId then
+        return
+    end
+
+    local owner = Players:GetPlayerByUserId(ownerUserId)
+    if not owner then
+        return
+    end
+
+    local itemId = tool:GetAttribute('ItemId')
+    local skillId = tool:GetAttribute('SkillId')
+    if itemId ~= nil then
+        itemId = tostring(itemId)
+    end
+    if skillId ~= nil then
+        skillId = tostring(skillId)
+    end
+    if (not itemId or itemId == '') and (not skillId or skillId == '') then
+        return
+    end
+
+    local removed = false
+    if skillId and skillId ~= '' then
+        removed = dependencies.InventoryService.removeSkill(owner, skillId)
+    elseif itemId and itemId ~= '' then
+        removed = dependencies.InventoryService.removeItem(owner, itemId, resolveItemDropAmount(tool))
+    end
+
+    if not removed then
+        return
+    end
+
+    tool:SetAttribute('DropProcessed', true)
+    spawnDroppedToolPickup(tool, itemId, skillId)
+    tool:Destroy()
+end
+
+local function disconnectTrackedTool(tool: Tool)
+    local existing = trackedToolConnections[tool]
+    if existing then
+        existing:Disconnect()
+        trackedToolConnections[tool] = nil
+    end
+end
+
+local function bindToolDropWatcher()
+    if dropWatcherConnection then
+        dropWatcherConnection:Disconnect()
+        dropWatcherConnection = nil
+    end
+
+    dropWatcherConnection = Workspace.ChildAdded:Connect(function(child)
+        if not child:IsA('Tool') then
+            return
+        end
+        task.defer(function()
+            processDroppedTool(child)
+        end)
+    end)
 end
 
 function ImportedAssetService.init(deps)
     dependencies = deps
+    table.clear(assetDefsSorted)
+    table.clear(assetDefByItemId)
+
+    for _, assetDef in pairs(ImportedAssetData) do
+        if type(assetDef) == 'table' and tonumber(assetDef.assetId) then
+            table.insert(assetDefsSorted, assetDef)
+            if assetDef.itemId then
+                assetDefByItemId[tostring(assetDef.itemId)] = assetDef
+            end
+        end
+    end
+
+    table.sort(assetDefsSorted, function(a, b)
+        local aIndex = tonumber(a.spawnIndex) or 99999
+        local bIndex = tonumber(b.spawnIndex) or 99999
+        if aIndex == bIndex then
+            return tostring(a.id) < tostring(b.id)
+        end
+        return aIndex < bIndex
+    end)
 end
 
 function ImportedAssetService.start()
-    local pickupFolder = getPickupFolder()
-    if not pickupFolder then
+    local staticPickupFolder = getStaticPickupFolder()
+    if not staticPickupFolder then
+        warn('[ImportedAssetService] Static pickup folder is missing (Workspace.Maps.Zoltraak.PlayerUse).')
+    else
+        clearChildren(staticPickupFolder)
+        for index, assetDef in ipairs(assetDefsSorted) do
+            local source = getPickupDisplaySource(assetDef)
+            local spawnCFrame = resolvePickupCFrame(assetDef, index)
+            local grantPayload = {
+                grantType = assetDef.grantType,
+                itemId = assetDef.itemId,
+                skillId = assetDef.skillId,
+                amount = 1,
+            }
+            spawnPickupModel(source, assetDef, grantPayload, spawnCFrame, staticPickupFolder, true)
+        end
+    end
+
+    bindToolDropWatcher()
+end
+
+function ImportedAssetService.trackInventoryTool(tool: Tool, ownerUserId: number)
+    if not tool or not tool:IsA('Tool') then
         return
     end
 
-    for _, assetDef in pairs(ImportedAssetData) do
-        local itemDef = ItemData[assetDef.itemId]
-        if itemDef and assetDef.pickupCFrame then
-            local existing = pickupFolder:FindFirstChild(assetDef.pickupName)
-            if existing then
-                existing:Destroy()
-            end
-            local model = createPickupModel(assetDef, itemDef)
-            positionPickupModel(model, assetDef.pickupCFrame)
-            model.Parent = pickupFolder
-        end
+    tool:SetAttribute('InventoryOwnerUserId', ownerUserId)
+
+    if trackedToolConnections[tool] then
+        return
     end
+
+    trackedToolConnections[tool] = tool.AncestryChanged:Connect(function(_, parent)
+        if parent == Workspace then
+            processDroppedTool(tool)
+            return
+        end
+
+        if parent == nil then
+            disconnectTrackedTool(tool)
+        end
+    end)
 end
 
 function ImportedAssetService.createToolClone(itemId: string): Tool?
-    local template = getTemplateTool(itemId)
+    local assetDef = assetDefByItemId[itemId]
+    if not assetDef then
+        return nil
+    end
+
+    local source = ensureSourcePackage(assetDef)
+    if not source then
+        return nil
+    end
+
+    local assetFolder = getAssetFolder(assetDef)
+    if not assetFolder then
+        return nil
+    end
+
+    ensureToolTemplate(assetDef, assetFolder, source)
+    local template = getTemplateTool(assetDef)
     if not template then
         return nil
     end
@@ -284,11 +808,48 @@ function ImportedAssetService.createToolClone(itemId: string): Tool?
     if itemDef and itemDef.displayName then
         clone.Name = itemDef.displayName
     end
-    clone:SetAttribute('ImportedAssetId', template:GetAttribute('ImportedAssetId') or itemId)
-    clone:SetAttribute('ImportedToolTemplate', template.Name)
+
+    clone:SetAttribute('ImportedAssetId', assetDef.assetId)
     clone:SetAttribute('ImportedInputPriority', true)
+    clone:SetAttribute('ItemId', itemId)
+    clone:SetAttribute('InventoryItemId', itemId)
+    clone.CanBeDropped = true
+
     configureImportedLocalScriptActivation(clone)
     return clone
+end
+
+function ImportedAssetService.grantAsset(player: Player, grantPayload)
+    local grantType = tostring(grantPayload.grantType or '')
+    if grantType == 'skill' then
+        local skillId = tostring(grantPayload.skillId or '')
+        if skillId == '' then
+            return false, 'This skill pickup is misconfigured.'
+        end
+        if not SkillData[skillId] then
+            return false, string.format('Unknown skill: %s', skillId)
+        end
+        local granted = dependencies.InventoryService.grantSkill(player, skillId)
+        if granted then
+            dependencies.Runtime.SystemMessage:FireClient(player, string.format('Learned skill: %s', SkillData[skillId].displayName or skillId))
+        else
+            dependencies.Runtime.SystemMessage:FireClient(player, string.format('You already know: %s', SkillData[skillId].displayName or skillId))
+        end
+        return true, nil
+    end
+
+    local itemId = tostring(grantPayload.itemId or '')
+    if itemId == '' then
+        return false, 'This pickup has no item mapping.'
+    end
+    if not ItemData[itemId] then
+        return false, string.format('Unknown item: %s', itemId)
+    end
+
+    local amount = math.max(1, math.floor(tonumber(grantPayload.amount) or 1))
+    dependencies.InventoryService.addItem(player, itemId, amount)
+    dependencies.Runtime.SystemMessage:FireClient(player, string.format('Picked up: %s x%d', ItemData[itemId].displayName or itemId, amount))
+    return true, nil
 end
 
 return ImportedAssetService

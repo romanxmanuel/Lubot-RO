@@ -54,6 +54,16 @@ local SKILL_SOUND_PROFILE = {
         Slash1 = { id = 'http://www.roblox.com/asset/?id=12222225', volume = 0.54, speed = 1.16 },
         Slash2 = { id = 'http://www.roblox.com/asset/?id=12222216', volume = 0.7, speed = 1.2 },
     },
+    gojo_blue_burst = {
+        Windup = { id = 'http://www.roblox.com/asset/?id=12222216', volume = 0.45, speed = 0.9 },
+        Slash1 = { id = 'rbxasset://sounds/electronicpingshort.wav', volume = 0.82, speed = 1.1 },
+        Recover = { id = 'rbxasset://sounds/collide.wav', volume = 0.6, speed = 1.3 },
+    },
+    hollow_purple_burst = {
+        Windup = { id = 'http://www.roblox.com/asset/?id=12222095', volume = 0.56, speed = 0.82 },
+        Slash1 = { id = 'rbxasset://sounds/Rocket whoosh 01.wav', volume = 0.85, speed = 0.92 },
+        Slash2 = { id = 'rbxasset://sounds/collide.wav', volume = 1, speed = 0.72 },
+    },
 }
 
 local function getDekuFxFolder(): Folder?
@@ -881,6 +891,111 @@ local function playNovaStrikeEffect(payload)
     end)
 end
 
+local function playGojoBlueBurstEffect(payload)
+    local direction = payload.direction or Vector3.new(0, 0, -1)
+    local origin = payload.origin or Vector3.zero
+    playSkillBite(payload, origin)
+    local vfx = payload.vfx or {}
+    local range = tonumber(vfx.range) or payload.range or 30
+    local duration = tonumber(vfx.duration) or 0.28
+    local spin = tonumber(vfx.spin) or 1.7
+    local look = getPlanarLookAndRight(direction)
+    local startOffset = 2.2
+    local travelDistance = range * 0.78
+
+    local clone = cloneMarketplaceTemplate('GojoBlueBurst')
+    if not clone then
+        playSlashEffect(payload, Color3.fromRGB(112, 198, 255), payload.width or 6)
+        return
+    end
+
+    setCloneColor(clone, Color3.fromRGB(112, 198, 255))
+    setCloneTransparency(clone, 0.06)
+    scaleCloneVisuals(clone, 0.82)
+    emitCloneParticles(clone, 38)
+
+    animateCloneMotion(clone, duration, function(alpha)
+        local eased = alpha * alpha * (3 - 2 * alpha)
+        local position = origin + Vector3.new(0, 2.1, 0) + look * (startOffset + (travelDistance * eased))
+        placeClone(clone, CFrame.lookAt(position, position + look) * CFrame.Angles(0, math.rad(520 * alpha * spin), 0))
+        setCloneTransparency(clone, 0.08 + math.max(alpha - 0.62, 0) * 1.7)
+    end)
+
+    task.delay(duration * 0.88, function()
+        local hitPosition = origin + Vector3.new(0, 2.1, 0) + look * (startOffset + travelDistance)
+        local burst = makeEffectPart(
+            Color3.fromRGB(140, 215, 255),
+            Vector3.new(2.6, 2.6, 2.6),
+            CFrame.new(hitPosition),
+            Enum.PartType.Ball,
+            0.1
+        )
+        tweenAndCleanup(burst, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = Vector3.new(7.5, 7.5, 7.5),
+            Transparency = 1,
+        })
+        playImpactPunch(hitPosition, Color3.fromRGB(112, 198, 255), 1.25)
+    end)
+end
+
+local function playHollowPurpleBurstEffect(payload)
+    local direction = payload.direction or Vector3.new(0, 0, -1)
+    local origin = payload.origin or Vector3.zero
+    playSkillBite(payload, origin)
+    local vfx = payload.vfx or {}
+    local range = tonumber(vfx.range) or payload.range or 34
+    local duration = tonumber(vfx.duration) or 0.34
+    local spin = tonumber(vfx.spin) or 1.45
+    local look = getPlanarLookAndRight(direction)
+    local startOffset = 2.4
+    local travelDistance = range * 0.76
+
+    local clone = cloneMarketplaceTemplate('HollowPurpleBurst')
+    if not clone then
+        playSlashEffect(payload, Color3.fromRGB(198, 132, 255), payload.width or 10)
+        return
+    end
+
+    setCloneColor(clone, Color3.fromRGB(198, 132, 255))
+    setCloneTransparency(clone, 0.08)
+    scaleCloneVisuals(clone, 1.1)
+    emitCloneParticles(clone, 52)
+
+    animateCloneMotion(clone, duration, function(alpha)
+        local eased = alpha * alpha * (3 - 2 * alpha)
+        local position = origin + Vector3.new(0, 2.3, 0) + look * (startOffset + (travelDistance * eased))
+        placeClone(clone, CFrame.lookAt(position, position + look) * CFrame.Angles(0, math.rad(420 * alpha * spin), 0))
+        setCloneTransparency(clone, 0.08 + math.max(alpha - 0.52, 0) * 1.5)
+    end)
+
+    task.delay(duration * 0.9, function()
+        local hitPosition = origin + Vector3.new(0, 2.1, 0) + look * (startOffset + travelDistance)
+        local ring = makeEffectPart(
+            Color3.fromRGB(215, 166, 255),
+            Vector3.new(0.35, 10.5, 10.5),
+            CFrame.new(hitPosition + Vector3.new(0, 0.25, 0)) * CFrame.Angles(math.rad(90), 0, 0),
+            Enum.PartType.Cylinder,
+            0.1
+        )
+        tweenAndCleanup(ring, TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            Size = Vector3.new(0.35, 28, 28),
+            Transparency = 1,
+        })
+        local burst = makeEffectPart(
+            Color3.fromRGB(202, 139, 255),
+            Vector3.new(3.2, 3.2, 3.2),
+            CFrame.new(hitPosition),
+            Enum.PartType.Ball,
+            0.16
+        )
+        tweenAndCleanup(burst, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = Vector3.new(9.6, 9.6, 9.6),
+            Transparency = 1,
+        })
+        playImpactPunch(hitPosition, Color3.fromRGB(198, 132, 255), 1.45)
+    end)
+end
+
 local function playVortexSpinEffect(payload)
     local origin = payload.origin or Vector3.zero
     playSkillBite(payload, origin)
@@ -1259,6 +1374,10 @@ function EffectsController.start()
             playCometDropEffect(payload)
         elseif effectName == MMONet.Effects.RazorOrbit then
             playRazorOrbitEffect(payload)
+        elseif effectName == MMONet.Effects.GojoBlueBurst then
+            playGojoBlueBurstEffect(payload)
+        elseif effectName == MMONet.Effects.HollowPurpleBurst then
+            playHollowPurpleBurstEffect(payload)
         elseif effectName == MMONet.Effects.EnemyAttack then
             playEnemyAttackEffect(payload)
         elseif effectName == MMONet.Effects.EnemyHit then

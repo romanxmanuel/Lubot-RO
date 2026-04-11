@@ -20,6 +20,12 @@ local ASSET_BUNDLES = {
     beamPack = {
         assetId = 139055633559547,
     },
+    gojoBluePack = {
+        assetId = 104047653740780,
+    },
+    hollowPurplePack = {
+        assetId = 82722798873168,
+    },
 }
 
 local TEMPLATE_SPECS = {
@@ -46,6 +52,14 @@ local TEMPLATE_SPECS = {
     RazorOrbit = {
         bundle = 'basePack',
         sourceNames = { 'DecalShockwave', 'CircleShockwave', 'FancySphere' },
+    },
+    GojoBlueBurst = {
+        bundle = 'gojoBluePack',
+        sourceNames = { 'Blue', 'BlueMo', 'Stuff', 'Wind' },
+    },
+    HollowPurpleBurst = {
+        bundle = 'hollowPurplePack',
+        sourceNames = { 'Purple', 'red', 'Blue', 'Main' },
     },
 }
 
@@ -144,12 +158,32 @@ local function loadAssetContainer(assetId: number)
         return InsertService:LoadAsset(assetId)
     end)
 
-    if not ok then
-        warn(string.format('[MarketplaceVfxService] Failed to load VFX asset %d: %s', assetId, tostring(loaded)))
+    if ok and loaded then
+        return loaded
+    end
+
+    warn(string.format('[MarketplaceVfxService] Failed to load VFX asset %d: %s', assetId, tostring(loaded)))
+
+    local okObjects, loadedObjects = pcall(function()
+        return game:GetObjects(string.format('rbxassetid://%d', assetId))
+    end)
+    if not okObjects then
+        warn(string.format('[MarketplaceVfxService] game:GetObjects failed for VFX asset %d: %s', assetId, tostring(loadedObjects)))
         return nil
     end
 
-    return loaded
+    if type(loadedObjects) ~= 'table' or #loadedObjects == 0 then
+        return nil
+    end
+
+    local container = Instance.new('Folder')
+    container.Name = string.format('MarketplaceAsset_%d', assetId)
+    for _, instance in ipairs(loadedObjects) do
+        if typeof(instance) == 'Instance' then
+            instance.Parent = container
+        end
+    end
+    return container
 end
 
 local function buildSourceBundle(fxRoot: Folder, bundleName: string, assetId: number)
@@ -221,6 +255,8 @@ local function buildTemplateFolder()
     templateFolder:SetAttribute('MarketplaceAssetId', ASSET_BUNDLES.basePack.assetId)
     templateFolder:SetAttribute('PowerSlashAssetId', ASSET_BUNDLES.powerSlashPack.assetId)
     templateFolder:SetAttribute('BeamAssetId', ASSET_BUNDLES.beamPack.assetId)
+    templateFolder:SetAttribute('GojoBlueAssetId', ASSET_BUNDLES.gojoBluePack.assetId)
+    templateFolder:SetAttribute('HollowPurpleAssetId', ASSET_BUNDLES.hollowPurplePack.assetId)
     templateFolder:SetAttribute('TemplateCount', createdCount)
 end
 

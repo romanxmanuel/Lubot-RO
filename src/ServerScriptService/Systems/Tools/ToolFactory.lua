@@ -33,7 +33,7 @@ local function buildToolBase(name: string, tooltip: string)
     local tool = Instance.new('Tool')
     tool.Name = name
     tool.ToolTip = tooltip
-    tool.CanBeDropped = false
+    tool.CanBeDropped = true
     tool.RequiresHandle = false
     return tool
 end
@@ -97,8 +97,19 @@ end
 
 function ToolFactory.createSkillTool(skillId: string, skillDef, onActivated)
     local tool = buildToolBase(skillDef.displayName, skillDef.description)
+    tool.RequiresHandle = true
     tool:SetAttribute('ToolKind', 'Skill')
     tool:SetAttribute('SkillId', skillId)
+
+    local handle = Instance.new('Part')
+    handle.Name = 'Handle'
+    handle.Size = Vector3.new(0.3, 0.3, 0.3)
+    handle.Transparency = 1
+    handle.CanCollide = false
+    handle.CanTouch = false
+    handle.CanQuery = false
+    handle.Massless = true
+    handle.Parent = tool
 
     tool.Activated:Connect(function()
         onActivated(tool)

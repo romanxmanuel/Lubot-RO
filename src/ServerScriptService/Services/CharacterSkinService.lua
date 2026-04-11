@@ -501,17 +501,26 @@ local function applyTemplateFace(character: Model, template: Model)
         return
     end
 
-    clearFaceCosmetics(characterHead)
-
     local templateHead = findTemplateHead(template)
     if not templateHead then
         return
     end
 
+    local templateFaceNodes = {}
     for _, child in ipairs(templateHead:GetChildren()) do
         if shouldCopyFaceInstance(child) then
-            child:Clone().Parent = characterHead
+            table.insert(templateFaceNodes, child)
         end
+    end
+
+    -- Keep existing face if the template does not include one.
+    if #templateFaceNodes == 0 then
+        return
+    end
+
+    clearFaceCosmetics(characterHead)
+    for _, faceNode in ipairs(templateFaceNodes) do
+        faceNode:Clone().Parent = characterHead
     end
 end
 
