@@ -25,7 +25,7 @@ local shineClock = 0
 
 local COLLAPSED_SIZE = UDim2.fromOffset(336, 132)
 local EXPANDED_SIZE = UDim2.fromOffset(336, 346)
-local ROOT_POSITION = UDim2.fromOffset(0, 0)
+local ROOT_POSITION = UDim2.fromOffset(8, 66)
 
 local TOKENS = {
 	window = Color3.fromRGB(19, 25, 41),
@@ -701,7 +701,12 @@ local function ensureGui()
 	utilityFrame.Name = "UtilityButtons"
 	utilityFrame.BackgroundTransparency = 1
 	utilityFrame.Size = UDim2.fromOffset(118, 26)
-	utilityFrame.Position = UDim2.new(0, 350, 0, 10)
+	utilityFrame.Position = UDim2.new(
+		ROOT_POSITION.X.Scale,
+		ROOT_POSITION.X.Offset + 350,
+		ROOT_POSITION.Y.Scale,
+		ROOT_POSITION.Y.Offset + 10
+	)
 	utilityFrame.ZIndex = 5
 	utilityFrame.Parent = rootGui
 
