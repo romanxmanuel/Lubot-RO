@@ -177,13 +177,35 @@ local function getFallbackSlotCenter(hotbarFrame: GuiObject, slotIndex: number):
     return Vector2.new(centerX, centerY)
 end
 
+local function getViewportFallbackSlotCenter(slotIndex: number): Vector2
+    local camera = workspace.CurrentCamera
+    if not camera then
+        return Vector2.new(0, 0)
+    end
+
+    local viewport = camera.ViewportSize
+    local slotWidth = HOTBAR_SLOT_SIZE
+    local totalWidth = slotWidth * HOTBAR_SLOT_COUNT + HOTBAR_SLOT_GAP * (HOTBAR_SLOT_COUNT - 1)
+    local startX = (viewport.X - totalWidth) * 0.5
+    local centerX = startX + (slotIndex - 1) * (slotWidth + HOTBAR_SLOT_GAP) + slotWidth * 0.5
+    local centerY = viewport.Y - (slotWidth * 0.52)
+    return Vector2.new(centerX, centerY)
+end
+
 local function ensureOverlayGui()
     if overlayGui and overlayGui.Parent then
         return
     end
 
     local playerGui = localPlayer:FindFirstChildOfClass('PlayerGui')
-    if not playerGui then
+    local parentTarget: Instance? = nil
+    local okCoreParent = pcall(function()
+        parentTarget = CoreGui
+    end)
+    if not okCoreParent or not parentTarget then
+        parentTarget = playerGui
+    end
+    if not parentTarget then
         return
     end
 
@@ -192,7 +214,7 @@ local function ensureOverlayGui()
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.DisplayOrder = 30
-    gui.Parent = playerGui
+    gui.Parent = parentTarget
 
     overlayGui = gui
 
@@ -201,14 +223,14 @@ local function ensureOverlayGui()
         label.Name = string.format('Cooldown_%d', slotIndex)
         label.Size = UDim2.fromOffset(34, 20)
         label.AnchorPoint = Vector2.new(0.5, 0.5)
-        label.BackgroundColor3 = Color3.fromRGB(20, 27, 42)
-        label.BackgroundTransparency = 0.22
+        label.BackgroundColor3 = Color3.fromRGB(10, 16, 29)
+        label.BackgroundTransparency = 0.05
         label.BorderSizePixel = 0
         label.Font = Enum.Font.GothamBold
-        label.TextColor3 = Color3.fromRGB(246, 250, 255)
-        label.TextSize = 12
+        label.TextColor3 = Color3.fromRGB(255, 245, 168)
+        label.TextSize = 13
         label.Visible = false
-        label.ZIndex = 5
+        label.ZIndex = 15
         label.Parent = gui
 
         local corner = Instance.new('UICorner')
@@ -216,8 +238,8 @@ local function ensureOverlayGui()
         corner.Parent = label
 
         local stroke = Instance.new('UIStroke')
-        stroke.Color = Color3.fromRGB(94, 132, 208)
-        stroke.Transparency = 0.1
+        stroke.Color = Color3.fromRGB(120, 168, 255)
+        stroke.Transparency = 0
         stroke.Thickness = 1
         stroke.Parent = label
 
@@ -474,17 +496,15 @@ local function updateCooldownUi()
             continue
         end
 
-        if not hotbarFrame or not hotbarFrame.Visible then
-            label.Visible = false
-            continue
-        end
-
-        local slotFrame = getSlotFrame(hotbarFrame, slotIndex)
+        local slotFrame = hotbarFrame and getSlotFrame(hotbarFrame, slotIndex) or nil
         local center = if slotFrame
             then slotFrame.AbsolutePosition + slotFrame.AbsoluteSize * 0.5
-            else getFallbackSlotCenter(hotbarFrame, slotIndex)
+            else if hotbarFrame
+                then getFallbackSlotCenter(hotbarFrame, slotIndex)
+                else getViewportFallbackSlotCenter(slotIndex)
 
-        label.Position = UDim2.fromOffset(math.floor(center.X), math.floor(center.Y))
+        local verticalOffset = if slotFrame then math.max(18, slotFrame.AbsoluteSize.Y * 0.62) else 20
+        label.Position = UDim2.fromOffset(math.floor(center.X), math.floor(center.Y - verticalOffset))
         label.Text = string.format('%.1f', math.max(remaining, 0))
         label.Visible = true
     end
@@ -553,6 +573,7 @@ function QuickCastController.start()
 
         local slotIndex = KEY_TO_SLOT[input.KeyCode]
         if slotIndex then
+            beginSlotCooldown(slotIndex, DEFAULT_COOLDOWN_SECONDS)
             latestCastToken += 1
             local token = latestCastToken
             task.defer(function()
