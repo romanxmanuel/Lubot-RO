@@ -107,8 +107,8 @@ end
 local function styleBillboard(dropPart: BasePart, drop)
     local billboard = Instance.new('BillboardGui')
     billboard.Name = 'DropBillboard'
-    billboard.Size = UDim2.fromOffset(180, 42)
-    billboard.StudsOffset = Vector3.new(0, 3.1, 0)
+    billboard.Size = UDim2.fromOffset(130, 28)
+    billboard.StudsOffset = Vector3.new(0, 2.25, 0)
     billboard.AlwaysOnTop = true
     billboard.MaxDistance = LootPresentationConfig.BillboardMaxDistance
     billboard.Parent = dropPart
@@ -118,7 +118,7 @@ local function styleBillboard(dropPart: BasePart, drop)
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.GothamBold
     label.TextScaled = false
-    label.TextSize = 13
+    label.TextSize = 10
     label.TextColor3 = LootPresentationConfig.getRarityColor(drop.rarity)
     label.TextStrokeColor3 = Color3.fromRGB(16, 18, 26)
     label.TextStrokeTransparency = 0.18
@@ -144,8 +144,8 @@ local function stylePickupPrompt(dropPart: BasePart, drop)
 
     local hint = Instance.new('BillboardGui')
     hint.Name = 'PickupHint'
-    hint.Size = UDim2.fromOffset(58, 24)
-    hint.StudsOffset = Vector3.new(1.45, 0.95, 0)
+    hint.Size = UDim2.fromOffset(46, 18)
+    hint.StudsOffset = Vector3.new(1.1, 0.7, 0)
     hint.AlwaysOnTop = true
     hint.MaxDistance = LootPresentationConfig.PromptHintMaxDistance or (LootPresentationConfig.PickupMaxDistance + 6)
     hint.Parent = dropPart
@@ -168,21 +168,21 @@ local function stylePickupPrompt(dropPart: BasePart, drop)
     stroke.Parent = backing
 
     local keyLabel = Instance.new('TextLabel')
-    keyLabel.Size = UDim2.fromOffset(18, 18)
-    keyLabel.Position = UDim2.fromOffset(4, 3)
+    keyLabel.Size = UDim2.fromOffset(12, 12)
+    keyLabel.Position = UDim2.fromOffset(3, 3)
     keyLabel.BackgroundTransparency = 1
     keyLabel.Font = Enum.Font.GothamBold
-    keyLabel.TextSize = 10
+    keyLabel.TextSize = 8
     keyLabel.TextColor3 = Color3.fromRGB(244, 246, 250)
     keyLabel.Text = 'E'
     keyLabel.Parent = backing
 
     local actionLabel = Instance.new('TextLabel')
     actionLabel.Size = UDim2.new(1, -26, 1, 0)
-    actionLabel.Position = UDim2.fromOffset(24, 0)
+    actionLabel.Position = UDim2.fromOffset(16, 0)
     actionLabel.BackgroundTransparency = 1
     actionLabel.Font = Enum.Font.GothamSemibold
-    actionLabel.TextSize = 9
+    actionLabel.TextSize = 7
     actionLabel.TextColor3 = Color3.fromRGB(226, 231, 239)
     actionLabel.TextXAlignment = Enum.TextXAlignment.Left
     actionLabel.Text = LootPresentationConfig.PromptActionText or 'Pick'
@@ -275,10 +275,10 @@ local function createDropPart(runtimeId: string, drop, position: Vector3)
     local visual = LootPresentationConfig.getRarityVisual(drop.rarity)
     local itemType = getDropItemType(drop)
     local partSize = if itemType == 'Equipment'
-        then Vector3.new(2.35, 2.35, 2.35)
+        then Vector3.new(1.45, 1.45, 1.45)
         elseif itemType == 'Card'
-        then Vector3.new(2.05, 2.05, 2.05)
-        else Vector3.new(1.95, 1.95, 1.95)
+        then Vector3.new(1.3, 1.3, 1.3)
+        else Vector3.new(1.18, 1.18, 1.18)
     local groundedPosition = resolveGroundDropPosition(position, partSize)
 
     local dropPart = Instance.new('Part')
@@ -303,9 +303,9 @@ local function createDropPart(runtimeId: string, drop, position: Vector3)
     selectionBox.Name = 'GlowBox'
     selectionBox.Adornee = dropPart
     selectionBox.Color3 = visual.color
-    selectionBox.LineThickness = visual.lineThickness or if drop.rarity == 'Legendary' or drop.rarity == 'Mythic' then 0.05 else 0.03
+    selectionBox.LineThickness = visual.lineThickness or if drop.rarity == 'Legendary' or drop.rarity == 'Mythic' then 0.03 else 0.018
     selectionBox.SurfaceTransparency = 1
-    selectionBox.Transparency = visual.glowTransparency or 0.32
+    selectionBox.Transparency = visual.glowTransparency or 0.62
     selectionBox.Parent = dropPart
 
     local pointLight = Instance.new('PointLight')

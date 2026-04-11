@@ -141,8 +141,12 @@ function DropResolver.roll(dropTableId: string, context)
     end
 
     if dropTable.tableType == 'Monster' then
-        local targetDropCount = rng:NextInteger(3, 6)
-        if #drops < targetDropCount then
+        local targetDropCount = rng:NextInteger(1, 2)
+        if #drops > targetDropCount then
+            while #drops > targetDropCount do
+                table.remove(drops)
+            end
+        elseif #drops < targetDropCount then
             local burstCandidates = buildMonsterBurstCandidates(dropTable)
             while #drops < targetDropCount and #burstCandidates > 0 do
                 local picked = WeightedRandom.pick(burstCandidates, rng)
