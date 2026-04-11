@@ -373,6 +373,24 @@ local function disableScriptsUnder(instance: Instance)
 end
 
 local function applyToolCompatibilityFixes(tool: Tool, assetDef)
+    -- Chaos Edge has internal Q/E cooldown values in its server script.
+    -- We keep the community script intact except for forcing those two values to zero.
+    if tonumber(assetDef.assetId) == 10288487412 then
+        for _, descendant in ipairs(tool:GetDescendants()) do
+            if descendant:IsA('Script') then
+                local source = descendant.Source
+                local patched = source
+                    :gsub('Properties%.StunCooldown%s*=%s*[%d%.]+', 'Properties.StunCooldown = 0')
+                    :gsub('Properties%.UnwingCooldown%s*=%s*[%d%.]+', 'Properties.UnwingCooldown = 0')
+                    :gsub('StunCooldown%s*=%s*[%d%.]+', 'StunCooldown = 0')
+                    :gsub('UnwingCooldown%s*=%s*[%d%.]+', 'UnwingCooldown = 0')
+                if patched ~= source then
+                    descendant.Source = patched
+                end
+            end
+        end
+    end
+
     -- Shadow Crescendo package ships duplicated script trees in Handle + root.
     -- Keeping both active causes hard runtime errors and breaks backpack flow.
     if tonumber(assetDef.assetId) == 10288446354 then
