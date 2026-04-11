@@ -505,11 +505,31 @@ local function ensureGui()
 	createText(header, {
 		text = "Player Profile",
 		position = UDim2.fromOffset(48, 14),
-		size = UDim2.fromOffset(150, 14),
+		size = UDim2.fromOffset(136, 14),
 		textSize = 14,
 		font = Enum.Font.GothamBold,
 		textColor3 = TOKENS.title,
 	})
+
+	local levelLabel = createText(header, {
+		text = "LV 1",
+		position = UDim2.fromOffset(186, 14),
+		size = UDim2.fromOffset(82, 14),
+		textSize = 14,
+		font = Enum.Font.GothamBlack,
+		textColor3 = TOKENS.gold,
+		textXAlignment = Enum.TextXAlignment.Right,
+		zIndex = 4,
+	})
+	local levelGradient = Instance.new("UIGradient")
+	levelGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 249, 189)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 214, 104)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(196, 142, 44)),
+	})
+	levelGradient.Rotation = 15
+	levelGradient.Parent = levelLabel
+	makeStroke(levelLabel, Color3.fromRGB(72, 45, 10), 0.2, 1)
 
 	local expandButton = createButton(header, "+", UDim2.fromOffset(26, 22), UDim2.new(1, -30, 0.5, -8))
 	expandButton.TextSize = 14
@@ -527,7 +547,7 @@ local function ensureGui()
 	})
 
 	local classLabel = createText(dashboard, {
-		text = "Knight  Lv.1 / Job 1",
+		text = "Knight",
 		position = UDim2.fromOffset(12, 70),
 		size = UDim2.fromOffset(200, 12),
 		textSize = 10,
@@ -541,13 +561,11 @@ local function ensureGui()
 
 	local _, hpFill, hpLabel, hpShine = createCompactBar(barsCard, "HP", TOKENS.hp, UDim2.fromOffset(4, 4), 160)
 	local _, spFill, spLabel, spShine = createCompactBar(barsCard, "SP", TOKENS.sp, UDim2.fromOffset(172, 4), 160)
-	local _, expFill, expLabel, expShine = createCompactBar(barsCard, "EXP", TOKENS.exp, UDim2.fromOffset(4, 26), 160)
-	local _, jexpFill, jexpLabel, jexpShine = createCompactBar(barsCard, "LV", TOKENS.jexp, UDim2.fromOffset(172, 26), 160)
+	local _, expFill, expLabel, expShine = createCompactBar(barsCard, "EXP", TOKENS.exp, UDim2.fromOffset(4, 26), 328)
 	refs.barShines = {
 		{ gradient = hpShine, speed = 0.65, phase = 0 },
 		{ gradient = spShine, speed = 0.72, phase = 0.22 },
 		{ gradient = expShine, speed = 0.58, phase = 0.44 },
-		{ gradient = jexpShine, speed = 0.5, phase = 0.66 },
 	}
 
 	local expandedSection = Instance.new("Frame")
@@ -664,14 +682,13 @@ local function ensureGui()
 	refs.expandButton = expandButton
 	refs.zenyLabel = zenyLabel
 	refs.classLabel = classLabel
+	refs.levelLabel = levelLabel
 	refs.hpFill = hpFill
 	refs.hpLabel = hpLabel
 	refs.spFill = spFill
 	refs.spLabel = spLabel
 	refs.expFill = expFill
 	refs.expLabel = expLabel
-	refs.jexpFill = jexpFill
-	refs.jexpLabel = jexpLabel
 	refs.expandedSection = expandedSection
 	refs.pointsValue = pointsValue
 	refs.resetButton = resetButton
@@ -746,7 +763,8 @@ local function updateSummary()
 	local level = localPlayer:GetAttribute("Level") or 1
 
 	refs.zenyLabel.Text = string.format("Zeny %s", tostring(zeny))
-	refs.classLabel.Text = string.format("%s  Lv.%s", prettyClassName(classId), tostring(level))
+	refs.classLabel.Text = prettyClassName(classId)
+	refs.levelLabel.Text = string.format("LV %d", level)
 
 	refs.hpFill.Size = UDim2.fromScale(getStatRatio(hp, maxHp), 1)
 	refs.hpLabel.Text = string.format("HP %d/%d", hp, maxHp)
@@ -756,9 +774,6 @@ local function updateSummary()
 
 	refs.expFill.Size = UDim2.fromScale(getStatRatio(exp, expMax), 1)
 	refs.expLabel.Text = string.format("EXP %d/%d", exp, expMax)
-
-	refs.jexpFill.Size = UDim2.fromScale(1, 1)
-	refs.jexpLabel.Text = string.format("LV %d", level)
 
 	local inventoryFrame, hotbarFrame = getNativeBackpackFrames()
 	if inventoryFrame and desiredInventoryVisible ~= nil and inventoryFrame.Visible ~= desiredInventoryVisible then
