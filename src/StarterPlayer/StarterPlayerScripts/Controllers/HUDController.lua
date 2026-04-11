@@ -288,12 +288,12 @@ local function getNativeBackpackFrames()
 
 	local inventoryFrame = backpackGui:FindFirstChild("Inventory")
 	local hotbarFrame = backpackGui:FindFirstChild("Hotbar")
-	if not (inventoryFrame and hotbarFrame) then
-		return nil, nil
-	end
 
-	if not inventoryFrame:IsA("GuiObject") or not hotbarFrame:IsA("GuiObject") then
-		return nil, nil
+	if inventoryFrame and not inventoryFrame:IsA("GuiObject") then
+		inventoryFrame = nil
+	end
+	if hotbarFrame and not hotbarFrame:IsA("GuiObject") then
+		hotbarFrame = nil
 	end
 
 	return inventoryFrame, hotbarFrame
@@ -305,24 +305,24 @@ local function toggleNativeInventoryWindow()
 	end)
 
 	local inventoryFrame, hotbarFrame = getNativeBackpackFrames()
-	if not inventoryFrame then
-		warn("[HUDController] Native backpack inventory frame not found; cannot toggle window.")
-		return
+	if inventoryFrame then
+		desiredInventoryVisible = not inventoryFrame.Visible
+	elseif desiredInventoryVisible == nil then
+		desiredInventoryVisible = true
+	else
+		desiredInventoryVisible = not desiredInventoryVisible
 	end
 
-	desiredInventoryVisible = not inventoryFrame.Visible
-
 	task.spawn(function()
-		for _ = 1, 20 do
+		for _ = 1, 80 do
 			local currentInventoryFrame, currentHotbarFrame = getNativeBackpackFrames()
-			if not currentInventoryFrame then
-				break
+			if currentInventoryFrame then
+				currentInventoryFrame.Visible = desiredInventoryVisible == true
 			end
-			currentInventoryFrame.Visible = desiredInventoryVisible == true
 			if currentHotbarFrame then
 				currentHotbarFrame.Visible = true
 			end
-			task.wait()
+			task.wait(0.03)
 		end
 	end)
 
@@ -724,7 +724,7 @@ local function ensureGui()
 		dependencies.Runtime.ActionRequest:FireServer({
 			action = MMONet.Actions.StashInventoryTools,
 		})
-		local inventoryFrame = getNativeBackpackFrames()
+		local inventoryFrame = select(1, getNativeBackpackFrames())
 		if inventoryFrame and not inventoryFrame.Visible then
 			toggleNativeInventoryWindow()
 		end
@@ -791,6 +791,8 @@ local function updateSummary()
 	if refs.inventoryToggleButton then
 		if inventoryFrame then
 			refs.inventoryToggleButton.Text = inventoryFrame.Visible and "Hide" or "Show"
+		elseif desiredInventoryVisible ~= nil then
+			refs.inventoryToggleButton.Text = desiredInventoryVisible and "Hide" or "Show"
 		else
 			refs.inventoryToggleButton.Text = "Bag"
 		end

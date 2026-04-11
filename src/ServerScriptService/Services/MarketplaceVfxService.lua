@@ -2,6 +2,7 @@
 
 local InsertService = game:GetService('InsertService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
+local ImportedAssetData = require(ReplicatedStorage.GameData.ImportedAssets.ImportedAssetData)
 
 local MarketplaceVfxService = {
     Name = 'MarketplaceVfxService',
@@ -153,6 +154,31 @@ local function clearChildren(parent: Instance)
     end
 end
 
+local function tryHydrateBundleFromImportedAssets(sourceFolder: Folder, assetId: number): boolean
+    local gameParts = ReplicatedStorage:FindFirstChild('GameParts')
+    local importedRoot = gameParts and gameParts:FindFirstChild('ImportedAssets')
+    if not importedRoot then
+        return false
+    end
+
+    for _, assetDef in pairs(ImportedAssetData) do
+        if type(assetDef) == 'table' and tonumber(assetDef.assetId) == assetId and type(assetDef.folderName) == 'string' then
+            local assetFolder = importedRoot:FindFirstChild(assetDef.folderName)
+            local sourcePackage = assetFolder and assetFolder:FindFirstChild('SourcePackage')
+            if sourcePackage then
+                clearChildren(sourceFolder)
+                for _, child in ipairs(sourcePackage:GetChildren()) do
+                    child:Clone().Parent = sourceFolder
+                end
+                sourceFolder:SetAttribute('HydratedFromImportedAssets', true)
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
 local function loadAssetContainer(assetId: number)
     local ok, loaded = pcall(function()
         return InsertService:LoadAsset(assetId)
@@ -189,6 +215,28 @@ end
 local function buildSourceBundle(fxRoot: Folder, bundleName: string, assetId: number)
     local sourceFolderName = string.format('%s%d', SOURCE_FOLDER_PREFIX, assetId)
     local sourceFolder = ensureFolder(fxRoot, sourceFolderName)
+    if #sourceFolder:GetDescendants() > 0 then
+        sourceFolder:SetAttribute('MarketplaceAssetId', assetId)
+        sourceFolder:SetAttribute('BundleName', bundleName)
+        return {
+            bundleName = bundleName,
+            assetId = assetId,
+            sourceFolder = sourceFolder,
+            sourcePool = collectSourcePool(sourceFolder),
+        }
+    end
+
+    if tryHydrateBundleFromImportedAssets(sourceFolder, assetId) then
+        sourceFolder:SetAttribute('MarketplaceAssetId', assetId)
+        sourceFolder:SetAttribute('BundleName', bundleName)
+        return {
+            bundleName = bundleName,
+            assetId = assetId,
+            sourceFolder = sourceFolder,
+            sourcePool = collectSourcePool(sourceFolder),
+        }
+    end
+
     local loaded = loadAssetContainer(assetId)
     if loaded then
         clearChildren(sourceFolder)

@@ -75,6 +75,22 @@ local function getAssetFolder(assetDef): Folder?
     return ensureFolder(importedRoot, assetDef.folderName)
 end
 
+local function findWorkspaceAssetContainer(assetId: number): Instance?
+    local direct = Workspace:FindFirstChild(tostring(assetId))
+    if direct then
+        return direct
+    end
+
+    for _, child in ipairs(Workspace:GetChildren()) do
+        local taggedAssetId = tonumber(child:GetAttribute('ImportedAssetId'))
+        if taggedAssetId and taggedAssetId == assetId then
+            return child
+        end
+    end
+
+    return nil
+end
+
 local function getStaticPickupFolder(): Folder?
     local maps = Workspace:FindFirstChild('Maps')
     local zoltraak = maps and maps:FindFirstChild('Zoltraak')
@@ -301,7 +317,8 @@ local function ensureSourcePackage(assetDef): Instance?
         source:Destroy()
     end
 
-    local loaded = loadAssetContainer(assetDef.assetId)
+    local workspaceSource = findWorkspaceAssetContainer(assetDef.assetId)
+    local loaded = if workspaceSource then workspaceSource:Clone() else loadAssetContainer(assetDef.assetId)
     if not loaded then
         warn(string.format('[ImportedAssetService] Could not load asset %d (%s).', assetDef.assetId, tostring(assetDef.displayName)))
         return nil
@@ -339,40 +356,40 @@ local function getTemplateTool(assetDef): Tool?
     return nil
 end
 
-local function configureImportedLocalScriptActivation(tool: Tool)
-    local localScriptStates: { [LocalScript]: boolean } = {}
+local function disableImportedToolScripts(tool: Tool)
     for _, descendant in ipairs(tool:GetDescendants()) do
-        if descendant:IsA('LocalScript') then
-            localScriptStates[descendant] = descendant.Enabled
-            descendant.Enabled = false
+        if descendant:IsA('Script') or descendant:IsA('LocalScript') then
+            descendant.Disabled = true
+        end
+    end
+end
+
+local function disableScriptsUnder(instance: Instance)
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA('Script') or descendant:IsA('LocalScript') then
+            descendant.Disabled = true
+        end
+    end
+end
+
+local function applyToolCompatibilityFixes(tool: Tool, assetDef)
+    -- Shadow Crescendo package ships duplicated script trees in Handle + root.
+    -- Keeping both active causes hard runtime errors and breaks backpack flow.
+    if tonumber(assetDef.assetId) == 10288446354 then
+        local handle = tool:FindFirstChild('Handle')
+        if handle then
+            disableScriptsUnder(handle)
         end
     end
 
-    if next(localScriptStates) == nil then
-        return
-    end
-
-    local function setEnabled(isEnabled: boolean)
-        for localScript, originalEnabled in pairs(localScriptStates) do
-            if localScript.Parent then
-                localScript.Enabled = isEnabled and originalEnabled
-            end
+    -- Azure package expects an embedded SoundBank child under CresHorror that is missing
+    -- in this import variant, causing infinite-yield spam.
+    if tonumber(assetDef.assetId) == 10288498712 then
+        local cres = tool:FindFirstChild('CresHorror')
+        if cres and cres:IsA('Script') and not cres:FindFirstChild('SoundBank') then
+            cres.Disabled = true
         end
     end
-
-    tool.Equipped:Connect(function()
-        setEnabled(true)
-    end)
-    tool.Unequipped:Connect(function()
-        setEnabled(false)
-    end)
-    tool.AncestryChanged:Connect(function()
-        if tool.Parent and tool.Parent:IsA('Backpack') then
-            setEnabled(false)
-        end
-    end)
-
-    setEnabled(false)
 end
 
 local function getDisplayName(assetDef): string
@@ -815,7 +832,15 @@ function ImportedAssetService.createToolClone(itemId: string): Tool?
     clone:SetAttribute('InventoryItemId', itemId)
     clone.CanBeDropped = true
 
-    configureImportedLocalScriptActivation(clone)
+    -- Preserve community tool behavior for actual tool assets.
+    -- Script or unknown packs are kept as collectible tools but sandboxed to avoid runtime breakage.
+    local expectedType = tostring(assetDef.expectedType or '')
+    if expectedType ~= 'tool' then
+        disableImportedToolScripts(clone)
+    else
+        applyToolCompatibilityFixes(clone, assetDef)
+    end
+
     return clone
 end
 
