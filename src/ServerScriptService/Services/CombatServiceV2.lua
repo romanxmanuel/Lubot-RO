@@ -184,16 +184,11 @@ function CombatServiceV2.start()
 end
 
 function CombatServiceV2.performBasicAttack(player: Player, payload)
-    if not dependencies.CharacterService.canUseAttack(player, GameConfig.BasicAttackCooldown) then
-        return false
-    end
-
     local origin, lookVector = getForwardVector(player)
     if not origin or not lookVector then
         return false
     end
 
-    dependencies.CharacterService.markAttackUsed(player)
     local styleName = type(payload) == 'table' and payload.styleName or 'Default'
     if styleName == 'DekuLegacy' then
         dependencies.Runtime.EffectEvent:FireAllClients(MMONet.Effects.DekuSmash, {

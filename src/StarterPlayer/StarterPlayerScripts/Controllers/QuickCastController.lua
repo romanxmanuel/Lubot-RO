@@ -23,6 +23,7 @@ local HOTBAR_SLOT_SIZE = 58
 local HOTBAR_SLOT_GAP = 5
 local HOTBAR_SLOT_COUNT = 10
 local DEFAULT_COOLDOWN_SECONDS = 1.5
+local COOLDOWNS_DISABLED = true
 local QUICK_CAST_RETRY_SECONDS = 0.18
 local QUICK_CAST_RETRY_STEP = 0.03
 local AUTO_TARGET_RANGE = 120
@@ -213,13 +214,18 @@ local function ensureOverlayGui()
     return true
 end
 
-local function ensureSlotWidget(slotIndex: number)
-    if not ensureOverlayGui() then
+local function ensureSlotWidget(slotIndex: number, slotFrame: GuiObject?)
+    if not slotFrame and not ensureOverlayGui() then
         return nil
     end
 
     local existing = slotWidgets[slotIndex]
-    if existing and existing.container.Parent == overlayGui then
+    local targetParent: Instance? = slotFrame or overlayGui
+    if not targetParent then
+        return nil
+    end
+
+    if existing and existing.container.Parent == targetParent then
         return existing
     end
 
@@ -229,13 +235,13 @@ local function ensureSlotWidget(slotIndex: number)
 
     local container = Instance.new('Frame')
     container.Name = 'MMOCooldownCircle'
-    container.Size = UDim2.fromOffset(28, 28)
+    container.Size = UDim2.fromOffset(34, 34)
     container.AnchorPoint = Vector2.new(0.5, 0.5)
     container.Position = UDim2.fromOffset(0, 0)
     container.BackgroundTransparency = 1
-    container.ZIndex = 25
+    container.ZIndex = 210
     container.Visible = false
-    container.Parent = overlayGui
+    container.Parent = targetParent
 
     local base = Instance.new('Frame')
     base.Name = 'Base'
@@ -243,7 +249,7 @@ local function ensureSlotWidget(slotIndex: number)
     base.BackgroundColor3 = Color3.fromRGB(8, 12, 22)
     base.BackgroundTransparency = 0.12
     base.BorderSizePixel = 0
-    base.ZIndex = 25
+    base.ZIndex = 210
     base.Parent = container
 
     local baseCorner = Instance.new('UICorner')
@@ -253,7 +259,7 @@ local function ensureSlotWidget(slotIndex: number)
     local baseStroke = Instance.new('UIStroke')
     baseStroke.Color = Color3.fromRGB(120, 168, 255)
     baseStroke.Transparency = 0
-    baseStroke.Thickness = 1.2
+    baseStroke.Thickness = 1.6
     baseStroke.Parent = base
 
     local fill = Instance.new('Frame')
@@ -263,7 +269,7 @@ local function ensureSlotWidget(slotIndex: number)
     fill.BackgroundColor3 = Color3.fromRGB(255, 245, 168)
     fill.BackgroundTransparency = 0.16
     fill.BorderSizePixel = 0
-    fill.ZIndex = 26
+    fill.ZIndex = 211
     fill.Parent = container
 
     local fillCorner = Instance.new('UICorner')
@@ -280,7 +286,7 @@ local function ensureSlotWidget(slotIndex: number)
     text.TextStrokeTransparency = 0.22
     text.TextScaled = true
     text.Text = ''
-    text.ZIndex = 27
+    text.ZIndex = 212
     text.Parent = container
 
     local created = {
@@ -293,6 +299,10 @@ local function ensureSlotWidget(slotIndex: number)
 end
 
 local function resolveToolCooldownSeconds(tool: Tool?): number
+    if COOLDOWNS_DISABLED then
+        return 0
+    end
+
     if not tool then
         return DEFAULT_COOLDOWN_SECONDS
     end
@@ -512,6 +522,10 @@ local function applyMovementAssist(tool: Tool, root: BasePart?, planarTarget: Ve
 end
 
 local function beginSlotCooldown(slotIndex: number, durationSeconds: number)
+    if COOLDOWNS_DISABLED then
+        return
+    end
+
     if durationSeconds <= 0 then
         return
     end
@@ -541,18 +555,20 @@ local function updateCooldownUi()
 
         local slotFrame = hotbarFrame and getSlotFrame(hotbarFrame, slotIndex) or nil
 
-        local widget = ensureSlotWidget(slotIndex)
+        local widget = ensureSlotWidget(slotIndex, slotFrame)
         if not widget then
             continue
         end
         widget.container.Visible = true
 
-        local center = if slotFrame
-            then slotFrame.AbsolutePosition + slotFrame.AbsoluteSize * 0.5
-            else if hotbarFrame
+        if slotFrame then
+            widget.container.Position = UDim2.fromScale(0.5, 0.5)
+        else
+            local center = if hotbarFrame
                 then getFallbackSlotCenter(hotbarFrame, slotIndex)
                 else getViewportFallbackSlotCenter(slotIndex)
-        widget.container.Position = UDim2.fromOffset(math.floor(center.X), math.floor(center.Y - 20))
+            widget.container.Position = UDim2.fromOffset(math.floor(center.X), math.floor(center.Y - 20))
+        end
 
         local total = slotCooldownDurations[slotIndex] or DEFAULT_COOLDOWN_SECONDS
         local ratio = math.clamp(remaining / math.max(total, 0.001), 0, 1)
@@ -629,7 +645,9 @@ function QuickCastController.start()
 
         local slotIndex = KEY_TO_SLOT[input.KeyCode]
         if slotIndex then
-            beginSlotCooldown(slotIndex, DEFAULT_COOLDOWN_SECONDS)
+            if not COOLDOWNS_DISABLED then
+                beginSlotCooldown(slotIndex, DEFAULT_COOLDOWN_SECONDS)
+            end
             latestCastToken += 1
             local token = latestCastToken
             task.defer(function()
