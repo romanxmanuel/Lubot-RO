@@ -4,6 +4,10 @@ local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local MMONet = require(ReplicatedStorage.Shared.Net.MMONet)
+local SkillTimelineData = require(ReplicatedStorage.GameData.Skills.SkillTimelineData)
+local HitboxService = require(script.Parent.Modules.HitboxService)
+local DamageService = require(script.Parent.Modules.DamageService)
+local VFXService = require(script.Parent.Modules.VFXService)
 
 local CombatServiceV2 = {
     Name = 'CombatService',
@@ -54,20 +58,98 @@ local SKILL_BEHAVIOR = {
 local function getForwardVector(player: Player)
     local root = dependencies.CharacterService.getHumanoidRootPart(player)
     if not root then
-        return nil, nil
+        return nil, nil, nil
     end
     local lookVector = root.CFrame.LookVector
     local planar = Vector3.new(lookVector.X, 0, lookVector.Z)
     if planar.Magnitude <= 0.001 then
         planar = Vector3.new(0, 0, -1)
     end
-    return root.Position, planar.Unit
+    return root.Position, planar.Unit, root
 end
 
 local function rollBasicAttackDamage(player: Player)
     local baseDamage = math.random(GameConfig.BasicAttackDamageMin, GameConfig.BasicAttackDamageMax)
     local attackPower = math.max(0, math.floor(player:GetAttribute('AttackPower') or 0))
     return baseDamage + attackPower
+end
+
+local function resolveEffectName(effectName: string?): string
+    if type(effectName) ~= 'string' or effectName == '' then
+        return MMONet.Effects.Slash
+    end
+    return (MMONet.Effects :: any)[effectName] or effectName
+end
+
+local function dashRoot(root: BasePart, direction: Vector3, distance: number): Vector3
+    if distance <= 0 then
+        return root.Position
+    end
+
+    local destination = root.Position + direction * distance
+    root.CFrame = CFrame.new(destination, destination + direction)
+    return destination
+end
+
+local function runSkillTimeline(player: Player, root: BasePart, initialLook: Vector3, skillId: string, skillDef, timelineDef)
+    local startedAt = os.clock()
+    local hitRegistry: { [string]: boolean } = {}
+
+    for _, phase in ipairs(timelineDef.phases or {}) do
+        local scheduleAt = tonumber(phase.t) or 0
+        local waitSeconds = scheduleAt - (os.clock() - startedAt)
+        if waitSeconds > 0 then
+            task.wait(waitSeconds)
+        end
+
+        if not root.Parent then
+            break
+        end
+
+        local currentLook = initialLook
+        local rootLook = root.CFrame.LookVector
+        local planarLook = Vector3.new(rootLook.X, 0, rootLook.Z)
+        if planarLook.Magnitude > 0.001 then
+            currentLook = planarLook.Unit
+        end
+
+        local currentOrigin = root.Position
+        if type(phase.move) == 'table' and phase.move.type == 'dash' then
+            currentOrigin = dashRoot(root, currentLook, tonumber(phase.move.distance) or 0)
+        end
+
+        local effectName = resolveEffectName(phase.effect or (SKILL_BEHAVIOR[skillId] and SKILL_BEHAVIOR[skillId].effect))
+        VFXService.emit(dependencies.Runtime.EffectEvent, effectName, {
+            userId = player.UserId,
+            skillId = skillId,
+            marker = phase.marker or 'Phase',
+            origin = currentOrigin,
+            direction = currentLook,
+            range = (phase.vfx and phase.vfx.range) or skillDef.range,
+            width = (phase.vfx and phase.vfx.width) or skillDef.width,
+            timeline = true,
+            vfx = phase.vfx,
+        })
+
+        if type(phase.hitbox) == 'table' then
+            local targets = HitboxService.acquireTargets(
+                dependencies.EnemyService,
+                currentOrigin,
+                currentLook,
+                phase.hitbox,
+                hitRegistry
+            )
+            if #targets > 0 then
+                DamageService.applyHits(
+                    dependencies.EnemyService,
+                    player,
+                    targets,
+                    skillDef.damage,
+                    tonumber(phase.hitbox.damageScale) or 1
+                )
+            end
+        end
+    end
 end
 
 function CombatServiceV2.init(deps)
@@ -126,9 +208,22 @@ function CombatServiceV2.performBasicAttack(player: Player, payload)
 end
 
 function CombatServiceV2.performSkill(player: Player, skillId: string, skillDef)
-    local origin, lookVector = getForwardVector(player)
-    if not origin or not lookVector then
+    local origin, lookVector, root = getForwardVector(player)
+    if not origin or not lookVector or not root then
         return false
+    end
+
+    local timelineDef = SkillTimelineData[skillId]
+    if timelineDef and type(timelineDef) == 'table' then
+        task.spawn(function()
+            local ok, err = pcall(function()
+                runSkillTimeline(player, root, lookVector, skillId, skillDef, timelineDef)
+            end)
+            if not ok then
+                warn(string.format('[CombatServiceV2] skill timeline failed (%s): %s', skillId, tostring(err)))
+            end
+        end)
+        return true
     end
 
     local behavior = SKILL_BEHAVIOR[skillId]
@@ -136,7 +231,7 @@ function CombatServiceV2.performSkill(player: Player, skillId: string, skillDef)
         return false
     end
 
-    dependencies.Runtime.EffectEvent:FireAllClients(behavior.effect, {
+    VFXService.emit(dependencies.Runtime.EffectEvent, behavior.effect, {
         userId = player.UserId,
         origin = origin,
         direction = lookVector,

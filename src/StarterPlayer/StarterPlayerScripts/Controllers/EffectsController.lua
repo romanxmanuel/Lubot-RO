@@ -2,6 +2,7 @@
 
 local Debris = game:GetService('Debris')
 local TweenService = game:GetService('TweenService')
+local RunService = game:GetService('RunService')
 local Workspace = game:GetService('Workspace')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
@@ -121,6 +122,56 @@ local function cloneMarketplaceTemplate(templateName: string): Instance?
     normalizeEffectClone(clone)
     clone.Parent = getFxParent()
     return clone
+end
+
+local function forEachClonePart(instance: Instance, callback)
+    if instance:IsA('BasePart') then
+        callback(instance)
+    end
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA('BasePart') then
+            callback(descendant)
+        end
+    end
+end
+
+local function emitCloneParticles(instance: Instance, burstCount: number?)
+    local count = burstCount or 24
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA('ParticleEmitter') then
+            descendant.Enabled = true
+            descendant:Emit(count)
+        elseif descendant:IsA('Trail') then
+            descendant.Enabled = true
+        elseif descendant:IsA('Beam') then
+            descendant.Enabled = true
+        end
+    end
+end
+
+local function animateCloneMotion(clone: Instance, duration: number, updater)
+    local safeDuration = math.max(duration, 0.05)
+    local startedAt = os.clock()
+    local connection = nil
+
+    connection = RunService.Heartbeat:Connect(function()
+        if not clone.Parent then
+            if connection then
+                connection:Disconnect()
+            end
+            return
+        end
+
+        local alpha = math.clamp((os.clock() - startedAt) / safeDuration, 0, 1)
+        updater(alpha)
+        if alpha >= 1 then
+            if connection then
+                connection:Disconnect()
+            end
+        end
+    end)
+
+    Debris:AddItem(clone, safeDuration + 0.45)
 end
 
 local function playWorldSound(soundId: string, position: Vector3, volume: number, playbackSpeed: number, lifetime: number)
@@ -397,114 +448,191 @@ local function playSlashEffect(payload, color: Color3, width: number)
     })
 end
 
+local function getPlanarLookAndRight(direction: Vector3): (Vector3, Vector3)
+    local planar = Vector3.new(direction.X, 0, direction.Z)
+    local look = if planar.Magnitude > 0.001 then planar.Unit else Vector3.new(0, 0, -1)
+    local right = look:Cross(Vector3.yAxis)
+    if right.Magnitude <= 0.001 then
+        right = Vector3.new(1, 0, 0)
+    else
+        right = right.Unit
+    end
+    return look, right
+end
+
 local function playArcFlareEffect(payload)
     local direction = payload.direction or Vector3.new(0, 0, -1)
     local origin = payload.origin or Vector3.zero
-    local range = payload.range or 18
-    local look = direction.Magnitude > 0.001 and direction.Unit or Vector3.new(0, 0, -1)
+    local vfx = payload.vfx or {}
+    local duration = tonumber(vfx.duration) or 0.28
+    local range = tonumber(vfx.range) or payload.range or 18
+    local side = tonumber(vfx.side) or 1
+    local arc = tonumber(vfx.arc) or 4.2
+    local spin = tonumber(vfx.spin) or 1.2
+    local look, right = getPlanarLookAndRight(direction)
 
     local clone = cloneMarketplaceTemplate('ArcFlare')
-    if clone then
-        setCloneColor(clone, Color3.fromRGB(119, 236, 255))
-        setCloneTransparency(clone, 0.15)
-        placeClone(clone, CFrame.lookAt(origin + Vector3.new(0, 2.6, 0), origin + Vector3.new(look.X, 2.6, look.Z)) * CFrame.new(0, 0, -range * 0.38))
-        task.delay(0.18, function()
-            if clone.Parent then
-                setCloneTransparency(clone, 1)
-                Debris:AddItem(clone, 0.06)
-            end
-        end)
-    else
+    if not clone then
         playSlashEffect(payload, Color3.fromRGB(119, 236, 255), payload.width or 9)
+        return
     end
+
+    setCloneColor(clone, Color3.fromRGB(119, 236, 255))
+    setCloneTransparency(clone, 0.1)
+    emitCloneParticles(clone, 32)
+
+    local baseHeight = 2.4
+    animateCloneMotion(clone, duration, function(alpha)
+        local wave = math.sin(alpha * math.pi)
+        local forward = look * (range * alpha)
+        local lateral = right * (wave * arc * side)
+        local vertical = Vector3.new(0, wave * 0.55, 0)
+        local position = origin + Vector3.new(0, baseHeight, 0) + forward + lateral + vertical
+        local rotation = CFrame.Angles(0, math.rad(180 * alpha * spin), math.rad((1 - alpha) * 20 * side))
+        placeClone(clone, CFrame.lookAt(position, position + look) * rotation)
+        setCloneTransparency(clone, 0.08 + alpha * 0.92)
+    end)
 end
 
 local function playNovaStrikeEffect(payload)
     local direction = payload.direction or Vector3.new(0, 0, -1)
     local origin = payload.origin or Vector3.zero
-    local range = payload.range or 24
-    local look = direction.Magnitude > 0.001 and direction.Unit or Vector3.new(0, 0, -1)
+    local vfx = payload.vfx or {}
+    local range = tonumber(vfx.range) or payload.range or 24
+    local duration = tonumber(vfx.duration) or 0.24
+    local spin = tonumber(vfx.spin) or 2
+    local look = getPlanarLookAndRight(direction)
 
     local clone = cloneMarketplaceTemplate('NovaStrike')
-    if clone then
-        setCloneColor(clone, Color3.fromRGB(166, 204, 255))
-        setCloneTransparency(clone, 0.1)
-        placeClone(clone, CFrame.lookAt(origin + Vector3.new(0, 2.2, 0), origin + Vector3.new(look.X, 2.2, look.Z)) * CFrame.new(0, 0, -range * 0.48))
-        task.delay(0.2, function()
-            if clone.Parent then
-                setCloneTransparency(clone, 1)
-                Debris:AddItem(clone, 0.06)
-            end
-        end)
-    else
+    if not clone then
         playSlashEffect(payload, Color3.fromRGB(166, 204, 255), payload.width or 5)
+        return
     end
+
+    setCloneColor(clone, Color3.fromRGB(166, 204, 255))
+    setCloneTransparency(clone, 0.05)
+    emitCloneParticles(clone, 36)
+
+    animateCloneMotion(clone, duration, function(alpha)
+        local eased = alpha * alpha * (3 - 2 * alpha)
+        local position = origin + Vector3.new(0, 2.1, 0) + look * (range * eased)
+        placeClone(clone, CFrame.lookAt(position, position + look) * CFrame.Angles(0, math.rad(560 * alpha * spin), 0))
+        setCloneTransparency(clone, 0.06 + math.max(alpha - 0.65, 0) * 2.6)
+    end)
+
+    task.delay(duration * 0.9, function()
+        local burst = makeEffectPart(
+            Color3.fromRGB(190, 222, 255),
+            Vector3.new(2.2, 2.2, 2.2),
+            CFrame.new(origin + Vector3.new(0, 2.1, 0) + look * range),
+            Enum.PartType.Ball,
+            0.12
+        )
+        tweenAndCleanup(burst, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = Vector3.new(6.4, 6.4, 6.4),
+            Transparency = 1,
+        })
+    end)
 end
 
 local function playVortexSpinEffect(payload)
     local origin = payload.origin or Vector3.zero
+    local vfx = payload.vfx or {}
+    local duration = tonumber(vfx.duration) or 0.3
+    local radius = tonumber(vfx.radius) or 5
+    local turns = tonumber(vfx.turns) or 1.6
     local clone = cloneMarketplaceTemplate('VortexSpin')
-    if clone then
-        setCloneColor(clone, Color3.fromRGB(194, 132, 255))
-        setCloneTransparency(clone, 0.22)
-        placeClone(clone, CFrame.new(origin + Vector3.new(0, 2.2, 0)))
-        task.delay(0.26, function()
-            if clone.Parent then
-                setCloneTransparency(clone, 1)
-                Debris:AddItem(clone, 0.08)
-            end
-        end)
-    else
+    if not clone then
         playSlashEffect(payload, Color3.fromRGB(194, 132, 255), payload.width or 12)
+        return
     end
+
+    setCloneColor(clone, Color3.fromRGB(194, 132, 255))
+    setCloneTransparency(clone, 0.15)
+    emitCloneParticles(clone, 42)
+
+    animateCloneMotion(clone, duration, function(alpha)
+        local theta = alpha * turns * math.pi * 2
+        local orbitRadius = radius * (0.6 + alpha * 0.5)
+        local position = origin + Vector3.new(math.cos(theta) * orbitRadius, 2 + math.sin(theta * 1.4) * 0.4, math.sin(theta) * orbitRadius)
+        placeClone(clone, CFrame.lookAt(position, origin + Vector3.new(0, 2, 0)) * CFrame.Angles(0, theta * 2.1, 0))
+        setCloneTransparency(clone, 0.12 + alpha * 0.86)
+    end)
 end
 
 local function playCometDropEffect(payload)
     local origin = payload.origin or Vector3.zero
     local direction = payload.direction or Vector3.new(0, 0, -1)
-    local look = direction.Magnitude > 0.001 and direction.Unit or Vector3.new(0, 0, -1)
+    local vfx = payload.vfx or {}
+    local look = getPlanarLookAndRight(direction)
+    local duration = tonumber(vfx.duration) or 0.24
+    local dropHeight = tonumber(vfx.height) or 22
+    local range = tonumber(vfx.range) or payload.range or 12
 
     local clone = cloneMarketplaceTemplate('CometDrop')
-    if clone then
-        setCloneColor(clone, Color3.fromRGB(255, 176, 118))
-        setCloneTransparency(clone, 0.16)
-        placeClone(clone, CFrame.lookAt(origin + Vector3.new(0, 18, 0), origin + Vector3.new(look.X, 18, look.Z)))
-        task.delay(0.15, function()
-            if clone.Parent then
-                placeClone(clone, CFrame.lookAt(origin + Vector3.new(0, 2, 0), origin + Vector3.new(look.X, 2, look.Z)))
-                setCloneTransparency(clone, 0.35)
-            end
-        end)
-        task.delay(0.32, function()
-            if clone.Parent then
-                setCloneTransparency(clone, 1)
-                Debris:AddItem(clone, 0.08)
-            end
-        end)
-    else
+    if not clone then
         playSlashEffect(payload, Color3.fromRGB(255, 176, 118), payload.width or 14)
+        return
     end
+
+    setCloneColor(clone, Color3.fromRGB(255, 176, 118))
+    setCloneTransparency(clone, 0.1)
+    emitCloneParticles(clone, 50)
+
+    local impactPoint = origin + look * math.max(range * 0.2, 0)
+    animateCloneMotion(clone, duration, function(alpha)
+        local eased = 1 - ((1 - alpha) * (1 - alpha))
+        local position = impactPoint + Vector3.new(0, dropHeight * (1 - eased) + 2.4, 0)
+        placeClone(clone, CFrame.lookAt(position, impactPoint + Vector3.new(0, 1.8, 0)) * CFrame.Angles(0, math.rad(alpha * 340), 0))
+        setCloneTransparency(clone, 0.08 + math.max(alpha - 0.55, 0) * 2.1)
+    end)
+
+    task.delay(duration * 0.92, function()
+        local ring = makeEffectPart(
+            Color3.fromRGB(255, 198, 148),
+            Vector3.new(0.35, 9, 9),
+            CFrame.new(impactPoint + Vector3.new(0, 0.3, 0)) * CFrame.Angles(math.rad(90), 0, 0),
+            Enum.PartType.Cylinder,
+            0.12
+        )
+        tweenAndCleanup(ring, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            Size = Vector3.new(0.35, 24, 24),
+            Transparency = 1,
+        })
+    end)
 end
 
 local function playRazorOrbitEffect(payload)
     local origin = payload.origin or Vector3.zero
     local direction = payload.direction or Vector3.new(0, 0, -1)
-    local look = direction.Magnitude > 0.001 and direction.Unit or Vector3.new(0, 0, -1)
+    local vfx = payload.vfx or {}
+    local duration = tonumber(vfx.duration) or 0.24
+    local range = tonumber(vfx.range) or payload.range or 18
+    local radius = tonumber(vfx.radius) or 4.5
+    local turns = tonumber(vfx.turns) or 1.6
+    local look, right = getPlanarLookAndRight(direction)
 
     local clone = cloneMarketplaceTemplate('RazorOrbit')
-    if clone then
-        setCloneColor(clone, Color3.fromRGB(205, 246, 255))
-        setCloneTransparency(clone, 0.2)
-        placeClone(clone, CFrame.lookAt(origin + Vector3.new(0, 2.3, 0), origin + Vector3.new(look.X, 2.3, look.Z)))
-        task.delay(0.22, function()
-            if clone.Parent then
-                setCloneTransparency(clone, 1)
-                Debris:AddItem(clone, 0.08)
-            end
-        end)
-    else
+    if not clone then
         playSlashEffect(payload, Color3.fromRGB(205, 246, 255), payload.width or 10)
+        return
     end
+
+    setCloneColor(clone, Color3.fromRGB(205, 246, 255))
+    setCloneTransparency(clone, 0.12)
+    emitCloneParticles(clone, 34)
+
+    animateCloneMotion(clone, duration, function(alpha)
+        local theta = alpha * turns * math.pi * 2
+        local orbitScale = 1 - math.max(alpha - 0.55, 0)
+        local orbitPosition = origin
+            + look * (range * alpha * 0.85)
+            + right * math.cos(theta) * radius * orbitScale
+            + Vector3.new(0, 2.25 + math.sin(theta * 1.4) * 0.25, 0)
+
+        placeClone(clone, CFrame.lookAt(orbitPosition, orbitPosition + look) * CFrame.Angles(0, theta * 2, math.rad(math.sin(theta) * 24)))
+        setCloneTransparency(clone, 0.08 + alpha * 0.9)
+    end)
 end
 
 local function playEnemyAttackEffect(payload)
