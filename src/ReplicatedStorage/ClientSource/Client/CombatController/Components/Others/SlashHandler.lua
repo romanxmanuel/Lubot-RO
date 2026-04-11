@@ -37,6 +37,7 @@ local assets = ReplicatedStorage:WaitForChild("Assets", 10)
 local PunchEffect = nil
 local BlockHitEffect = nil
 local SlashVfx = nil
+local SlashBeam = nil  -- Beam-based arc VFX (positioned between two spread parts)
 
 -- Slash VFX rotation configuration per combo index
 -- Each entry contains:
@@ -321,6 +322,53 @@ local function playSlashVfx(hrp, comboIndex)
 	end)
 end
 
+-- Play beam slash arc VFX (briefly enables a Beam between two spread parts)
+local function playBeamVfx(hrp, comboIndex)
+	if not SlashBeam or not hrp then return end
+
+	local clone = SlashBeam:Clone()
+	clone.Parent = workspace
+
+	local beamStart = clone:FindFirstChild("BeamStart")
+	local beamEnd   = clone:FindFirstChild("BeamEnd")
+	local beam      = beamStart and beamStart:FindFirstChildOfClass("Beam")
+	if not beamStart or not beamEnd or not beam then
+		clone:Destroy()
+		return
+	end
+
+	-- Spread the two anchor parts around the slash position
+	local rotConfig = SLASH_ROTATIONS[comboIndex] or { hrp = CFrame.Angles(0, 0, 0), forceForward = true }
+
+	local baseCF
+	if rotConfig.forceForward then
+		local look = hrp.CFrame.LookVector
+		local flatCF = CFrame.lookAt(hrp.Position, hrp.Position + Vector3.new(look.X, 0, look.Z))
+		baseCF = flatCF * CFrame.new(0, 0, -3)
+	else
+		baseCF = hrp.CFrame * CFrame.new(0, 0, -3)
+	end
+
+	-- Spread 4 studs apart (left → right of swing)
+	beamStart.CFrame = baseCF * CFrame.new(-4, 1, 0)
+	beamEnd.CFrame   = baseCF * CFrame.new(4, -1, 0)
+	beamStart.Anchored = true
+	beamEnd.Anchored   = true
+
+	-- Brief flash: enable → fade out → destroy
+	beam.Enabled = true
+	task.delay(0.08, function()
+		if beam and beam.Parent then
+			beam.Enabled = false
+		end
+	end)
+	task.delay(0.25, function()
+		if clone and clone.Parent then
+			clone:Destroy()
+		end
+	end)
+end
+
 -- Movement debuff functions
 local function applyMovementDebuff(character)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -385,14 +433,16 @@ function SlashHandler:TrySlash()
 		playSound(soundId, character, soundDelay)
 	end
 
-	-- Play slash VFX with optional delay
+	-- Play slash VFX with optional delay (particles + beam arc)
 	local vfxDelay = SlashSettings.SlashVfxDelay or 0
 	if vfxDelay > 0 then
 		task.delay(vfxDelay, function()
 			playSlashVfx(hrp, currentCombo)
+			playBeamVfx(hrp, currentCombo)
 		end)
 	else
 		playSlashVfx(hrp, currentCombo)
+		playBeamVfx(hrp, currentCombo)
 	end
 
 	-- Apply movement debuff
@@ -464,7 +514,8 @@ function SlashHandler.Start()
 
 		local slashesFolder = effectsFolder:FindFirstChild("Slashes")
 		if slashesFolder then
-			SlashVfx = slashesFolder:FindFirstChild("SlashVfx")
+			SlashVfx   = slashesFolder:FindFirstChild("SlashVfx")
+			SlashBeam  = slashesFolder:FindFirstChild("SlashBeam")
 		end
 
 		local combatFolder = effectsFolder:FindFirstChild("Combat")

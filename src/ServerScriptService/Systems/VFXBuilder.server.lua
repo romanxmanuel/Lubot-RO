@@ -215,4 +215,50 @@ makeParticle(punchEffect, "HitSparks", {
 	emitCount = 25,
 })
 
-print("[VFXBuilder] SlashVfx and PunchEffect ready in ReplicatedStorage.Assets.Effects")
+-- ─── SlashBeam ────────────────────────────────────────────────────────────
+-- Beam-based slash arc. SlashHandler clones this, spreads BeamStart/BeamEnd
+-- apart, briefly enables the Beam, then destroys.
+-- Texture: rbxassetid://12781852969 (from original asset 15799946390)
+
+local existingBeam = slashes:FindFirstChild("SlashBeam")
+if existingBeam then existingBeam:Destroy() end
+
+local slashBeamModel = Instance.new("Model")
+slashBeamModel.Name = "SlashBeam"
+slashBeamModel.Parent = slashes
+
+local beamStart = makePart(slashBeamModel, "BeamStart", Vector3.new(0.5, 0.5, 0.5))
+local beamEnd   = makePart(slashBeamModel, "BeamEnd",   Vector3.new(0.5, 0.5, 0.5))
+
+local att0 = Instance.new("Attachment")
+att0.Name = "A0"
+att0.Parent = beamStart
+
+local att1 = Instance.new("Attachment")
+att1.Name = "A1"
+att1.Parent = beamEnd
+
+local beam = Instance.new("Beam")
+beam.Name         = "Arc"
+beam.Attachment0  = att0
+beam.Attachment1  = att1
+beam.Texture      = "rbxassetid://12781852969"
+beam.TextureLength = 1.375
+beam.Width0       = 3
+beam.Width1       = 3
+beam.LightEmission = 1
+beam.FaceCamera   = true
+beam.Segments     = 10
+beam.Enabled      = false   -- SlashHandler enables briefly per swing
+beam.Color        = ColorSequence.new({
+	ColorSequenceKeypoint.new(0,   Color3.fromRGB(0, 19, 133)),
+	ColorSequenceKeypoint.new(1,   Color3.fromRGB(0, 19, 133)),
+})
+beam.Transparency = NumberSequence.new({
+	NumberSequenceKeypoint.new(0,   0.4),
+	NumberSequenceKeypoint.new(0.5, 0),
+	NumberSequenceKeypoint.new(1,   0.4),
+})
+beam.Parent = beamStart
+
+print("[VFXBuilder] SlashVfx, PunchEffect, and SlashBeam ready in ReplicatedStorage.Assets.Effects")
