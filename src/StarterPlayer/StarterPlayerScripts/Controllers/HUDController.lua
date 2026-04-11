@@ -21,34 +21,10 @@ local rootGui: ScreenGui? = nil
 local refs = {}
 local expanded = false
 local desiredInventoryVisible: boolean? = nil
-local slotCooldownEnds: { [number]: number } = {}
 
 local COLLAPSED_SIZE = UDim2.fromOffset(336, 148)
 local EXPANDED_SIZE = UDim2.fromOffset(336, 360)
 local ROOT_POSITION = UDim2.fromOffset(12, 72)
-local HOTBAR_SLOT_COUNT = 10
-local DEFAULT_SKILL_COOLDOWN = 1.5
-
-local SLOT_KEYCODES: { [Enum.KeyCode]: number } = {
-	[Enum.KeyCode.One] = 1,
-	[Enum.KeyCode.Two] = 2,
-	[Enum.KeyCode.Three] = 3,
-	[Enum.KeyCode.Four] = 4,
-	[Enum.KeyCode.Five] = 5,
-	[Enum.KeyCode.Six] = 6,
-	[Enum.KeyCode.Seven] = 7,
-	[Enum.KeyCode.Eight] = 8,
-	[Enum.KeyCode.Nine] = 9,
-	[Enum.KeyCode.Zero] = 10,
-}
-
-local COOLDOWN_ATTRIBUTE_NAMES = {
-	'CooldownSeconds',
-	'Cooldown',
-	'SkillCooldown',
-	'CastCooldown',
-	'ActivationCooldown',
-}
 
 local TOKENS = {
 	window = Color3.fromRGB(19, 25, 41),
@@ -265,52 +241,6 @@ end
 
 local function fireStatRequest(payload)
 	dependencies.Runtime.StatRequest:FireServer(payload)
-end
-
-local function getEquippedTool(): Tool?
-	local character = localPlayer.Character
-	if not character then
-		return nil
-	end
-
-	for _, child in ipairs(character:GetChildren()) do
-		if child:IsA("Tool") then
-			return child
-		end
-	end
-
-	return nil
-end
-
-local function resolveToolCooldownSeconds(tool: Tool?): number
-	if not tool then
-		return DEFAULT_SKILL_COOLDOWN
-	end
-
-	for _, attributeName in ipairs(COOLDOWN_ATTRIBUTE_NAMES) do
-		local value = tool:GetAttribute(attributeName)
-		if typeof(value) == "number" and value > 0 then
-			return value
-		end
-		if typeof(value) == "string" then
-			local parsed = tonumber(value)
-			if parsed and parsed > 0 then
-				return parsed
-			end
-		end
-	end
-
-	return DEFAULT_SKILL_COOLDOWN
-end
-
-local function beginSlotCooldown(slotIndex: number, durationSeconds: number)
-	if durationSeconds <= 0 then
-		return
-	end
-
-	local nextReady = os.clock() + durationSeconds
-	local existingReady = slotCooldownEnds[slotIndex] or 0
-	slotCooldownEnds[slotIndex] = math.max(existingReady, nextReady)
 end
 
 local function getNativeBackpackFrames()
@@ -740,38 +670,6 @@ local function ensureGui()
 	refs.inventoryToggleButton = inventoryToggleButton
 	refs.stashButton = stashButton
 
-	local cooldownStrip = Instance.new("Frame")
-	cooldownStrip.Name = "CooldownStrip"
-	cooldownStrip.BackgroundTransparency = 1
-	cooldownStrip.Size = UDim2.fromOffset(560, 20)
-	cooldownStrip.AnchorPoint = Vector2.new(0.5, 1)
-	cooldownStrip.Position = UDim2.new(0.5, 0, 1, -148)
-	cooldownStrip.ZIndex = 7
-	cooldownStrip.Parent = rootGui
-
-	local cooldownLabels = {}
-	for slotIndex = 1, HOTBAR_SLOT_COUNT do
-		local label = Instance.new("TextLabel")
-		label.Name = string.format("Cooldown%d", slotIndex)
-		label.Size = UDim2.fromOffset(34, 18)
-		label.AnchorPoint = Vector2.new(0.5, 0.5)
-		label.Position = UDim2.fromOffset(44 + ((slotIndex - 1) * 55), 10)
-		label.BackgroundColor3 = Color3.fromRGB(10, 16, 29)
-		label.BackgroundTransparency = 0.12
-		label.BorderSizePixel = 0
-		label.Font = Enum.Font.GothamBold
-		label.TextColor3 = Color3.fromRGB(255, 246, 172)
-		label.TextSize = 12
-		label.Text = ""
-		label.Visible = false
-		label.ZIndex = 8
-		label.Parent = cooldownStrip
-		makeCorner(label, 5)
-		makeStroke(label, Color3.fromRGB(120, 168, 255), 0, 1)
-		cooldownLabels[slotIndex] = label
-	end
-	refs.cooldownLabels = cooldownLabels
-
 	applyExpansionVisualState()
 end
 
@@ -838,23 +736,6 @@ local function updateSummary()
 
 	refs.stashButton.Text = "Store"
 
-	local now = os.clock()
-	if refs.cooldownLabels then
-		for slotIndex = 1, HOTBAR_SLOT_COUNT do
-			local label = refs.cooldownLabels[slotIndex]
-			if label then
-				local remaining = (slotCooldownEnds[slotIndex] or 0) - now
-				if remaining <= 0 then
-					slotCooldownEnds[slotIndex] = nil
-					label.Visible = false
-				else
-					label.Text = string.format('%.1f', remaining)
-					label.Visible = true
-				end
-			end
-		end
-	end
-
 	refreshStatsSection()
 end
 
@@ -876,18 +757,6 @@ function HUDController.start()
 	localPlayer:GetAttributeChangedSignal("StatPoints"):Connect(refreshStatsSection)
 
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if UserInputService:GetFocusedTextBox() then
-			return
-		end
-
-		local slotIndex = SLOT_KEYCODES[input.KeyCode]
-		if slotIndex then
-			task.defer(function()
-				task.wait(0.06)
-				beginSlotCooldown(slotIndex, resolveToolCooldownSeconds(getEquippedTool()))
-			end)
-		end
-
 		if gameProcessed then
 			return
 		end

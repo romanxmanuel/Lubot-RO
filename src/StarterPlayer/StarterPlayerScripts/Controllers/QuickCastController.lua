@@ -14,8 +14,9 @@ local dependencies = nil
 local started = false
 
 local overlayGui: ScreenGui? = nil
-local slotLabels: { [number]: TextLabel } = {}
 local slotCooldownEnds: { [number]: number } = {}
+local slotCooldownDurations: { [number]: number } = {}
+local slotWidgets: { [number]: { container: Frame, fill: Frame, text: TextLabel } } = {}
 local latestCastToken = 0
 
 local HOTBAR_SLOT_SIZE = 58
@@ -194,57 +195,101 @@ end
 
 local function ensureOverlayGui()
     if overlayGui and overlayGui.Parent then
-        return
+        return true
     end
 
     local playerGui = localPlayer:FindFirstChildOfClass('PlayerGui')
-    local parentTarget: Instance? = nil
-    local okCoreParent = pcall(function()
-        parentTarget = CoreGui
-    end)
-    if not okCoreParent or not parentTarget then
-        parentTarget = playerGui
-    end
-    if not parentTarget then
-        return
+    if not playerGui then
+        return false
     end
 
     local gui = Instance.new('ScreenGui')
     gui.Name = 'MMOQuickCastCooldowns'
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
-    gui.DisplayOrder = 30
-    gui.Parent = parentTarget
-
+    gui.DisplayOrder = 99
+    gui.Parent = playerGui
     overlayGui = gui
+    return true
+end
 
-    for slotIndex = 1, HOTBAR_SLOT_COUNT do
-        local label = Instance.new('TextLabel')
-        label.Name = string.format('Cooldown_%d', slotIndex)
-        label.Size = UDim2.fromOffset(34, 20)
-        label.AnchorPoint = Vector2.new(0.5, 0.5)
-        label.BackgroundColor3 = Color3.fromRGB(10, 16, 29)
-        label.BackgroundTransparency = 0.05
-        label.BorderSizePixel = 0
-        label.Font = Enum.Font.GothamBold
-        label.TextColor3 = Color3.fromRGB(255, 245, 168)
-        label.TextSize = 13
-        label.Visible = false
-        label.ZIndex = 15
-        label.Parent = gui
-
-        local corner = Instance.new('UICorner')
-        corner.CornerRadius = UDim.new(0, 6)
-        corner.Parent = label
-
-        local stroke = Instance.new('UIStroke')
-        stroke.Color = Color3.fromRGB(120, 168, 255)
-        stroke.Transparency = 0
-        stroke.Thickness = 1
-        stroke.Parent = label
-
-        slotLabels[slotIndex] = label
+local function ensureSlotWidget(slotIndex: number)
+    if not ensureOverlayGui() then
+        return nil
     end
+
+    local existing = slotWidgets[slotIndex]
+    if existing and existing.container.Parent == overlayGui then
+        return existing
+    end
+
+    if existing and existing.container.Parent then
+        existing.container:Destroy()
+    end
+
+    local container = Instance.new('Frame')
+    container.Name = 'MMOCooldownCircle'
+    container.Size = UDim2.fromOffset(28, 28)
+    container.AnchorPoint = Vector2.new(0.5, 0.5)
+    container.Position = UDim2.fromOffset(0, 0)
+    container.BackgroundTransparency = 1
+    container.ZIndex = 25
+    container.Visible = false
+    container.Parent = overlayGui
+
+    local base = Instance.new('Frame')
+    base.Name = 'Base'
+    base.Size = UDim2.fromScale(1, 1)
+    base.BackgroundColor3 = Color3.fromRGB(8, 12, 22)
+    base.BackgroundTransparency = 0.12
+    base.BorderSizePixel = 0
+    base.ZIndex = 25
+    base.Parent = container
+
+    local baseCorner = Instance.new('UICorner')
+    baseCorner.CornerRadius = UDim.new(1, 0)
+    baseCorner.Parent = base
+
+    local baseStroke = Instance.new('UIStroke')
+    baseStroke.Color = Color3.fromRGB(120, 168, 255)
+    baseStroke.Transparency = 0
+    baseStroke.Thickness = 1.2
+    baseStroke.Parent = base
+
+    local fill = Instance.new('Frame')
+    fill.Name = 'Fill'
+    fill.Size = UDim2.fromScale(1, 1)
+    fill.Position = UDim2.fromScale(0, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(255, 245, 168)
+    fill.BackgroundTransparency = 0.16
+    fill.BorderSizePixel = 0
+    fill.ZIndex = 26
+    fill.Parent = container
+
+    local fillCorner = Instance.new('UICorner')
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = fill
+
+    local text = Instance.new('TextLabel')
+    text.Name = 'Text'
+    text.Size = UDim2.fromScale(1, 1)
+    text.BackgroundTransparency = 1
+    text.Font = Enum.Font.GothamBold
+    text.TextColor3 = Color3.fromRGB(255, 255, 255)
+    text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    text.TextStrokeTransparency = 0.22
+    text.TextScaled = true
+    text.Text = ''
+    text.ZIndex = 27
+    text.Parent = container
+
+    local created = {
+        container = container,
+        fill = fill,
+        text = text,
+    }
+    slotWidgets[slotIndex] = created
+    return created
 end
 
 local function resolveToolCooldownSeconds(tool: Tool?): number
@@ -475,38 +520,51 @@ local function beginSlotCooldown(slotIndex: number, durationSeconds: number)
     local nextReady = now + durationSeconds
     local existingReady = slotCooldownEnds[slotIndex] or 0
     slotCooldownEnds[slotIndex] = math.max(existingReady, nextReady)
+    slotCooldownDurations[slotIndex] = durationSeconds
 end
 
 local function updateCooldownUi()
-    ensureOverlayGui()
-
     local hotbarFrame = getNativeHotbarFrame()
     local now = os.clock()
 
     for slotIndex = 1, HOTBAR_SLOT_COUNT do
-        local label = slotLabels[slotIndex]
-        if not label then
-            continue
-        end
-
         local remaining = (slotCooldownEnds[slotIndex] or 0) - now
         if remaining <= 0 then
             slotCooldownEnds[slotIndex] = nil
-            label.Visible = false
+            slotCooldownDurations[slotIndex] = nil
+            local widget = slotWidgets[slotIndex]
+            if widget then
+                widget.container.Visible = false
+            end
             continue
         end
 
         local slotFrame = hotbarFrame and getSlotFrame(hotbarFrame, slotIndex) or nil
+
+        local widget = ensureSlotWidget(slotIndex)
+        if not widget then
+            continue
+        end
+        widget.container.Visible = true
+
         local center = if slotFrame
             then slotFrame.AbsolutePosition + slotFrame.AbsoluteSize * 0.5
             else if hotbarFrame
                 then getFallbackSlotCenter(hotbarFrame, slotIndex)
                 else getViewportFallbackSlotCenter(slotIndex)
+        widget.container.Position = UDim2.fromOffset(math.floor(center.X), math.floor(center.Y - 20))
 
-        local verticalOffset = if slotFrame then math.max(18, slotFrame.AbsoluteSize.Y * 0.62) else 20
-        label.Position = UDim2.fromOffset(math.floor(center.X), math.floor(center.Y - verticalOffset))
-        label.Text = string.format('%.1f', math.max(remaining, 0))
-        label.Visible = true
+        local total = slotCooldownDurations[slotIndex] or DEFAULT_COOLDOWN_SECONDS
+        local ratio = math.clamp(remaining / math.max(total, 0.001), 0, 1)
+        local diameter = math.max(0.1, ratio)
+        widget.fill.Size = UDim2.fromScale(diameter, diameter)
+        widget.fill.Position = UDim2.fromScale((1 - diameter) * 0.5, (1 - diameter) * 0.5)
+
+        if remaining >= 10 then
+            widget.text.Text = string.format('%d', math.ceil(remaining))
+        else
+            widget.text.Text = string.format('%.1f', remaining)
+        end
     end
 end
 
@@ -563,8 +621,6 @@ function QuickCastController.start()
         return
     end
     started = true
-
-    ensureOverlayGui()
 
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if UserInputService:GetFocusedTextBox() then
