@@ -1,6 +1,8 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 local Debris = game:GetService("Debris")
 local AssetRegistry = require(script.Parent.AssetRegistry)
+local MasterConfig = require(ReplicatedStorage:WaitForChild("MasterConfig"))
 
 local SFXService = {}
 
@@ -19,11 +21,14 @@ local function playOneShot(id, parent, volume)
 end
 
 function SFXService.PlayDash(parent)
-    return playOneShot(AssetRegistry.SFX.Dash, parent, 0.95)
+    return playOneShot(MasterConfig.DashSoundId or AssetRegistry.SFX.Dash, parent, MasterConfig.DashSoundVolume or 0.95)
 end
 
 function SFXService.PlayHit(index, parent)
-    return playOneShot(AssetRegistry.SFX["Hit" .. tostring(index)], parent, 1)
+    local configId = (MasterConfig.PunchSounds and MasterConfig.PunchSounds[index]) or nil
+    local soundId = configId or AssetRegistry.SFX["Hit" .. tostring(index)]
+    local volume = (MasterConfig.PunchSoundVolumes and MasterConfig.PunchSoundVolumes[index]) or 1
+    return playOneShot(soundId, parent, volume)
 end
 
 return SFXService
