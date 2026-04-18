@@ -16,11 +16,12 @@ local AssetRegistry = {
         Shockwave = "Meteor",
     },
     SFX = {
-        Hit1 = "rbxassetid://78839860221018",
-        Hit2 = "rbxassetid://95112734054189",
-        Hit3 = "rbxassetid://89857951233805",
-        Hit4 = "rbxassetid://75134542001431",
-        Hit5 = "rbxassetid://83233296435576",
+        Dash = "rbxassetid://132482473659637",
+        Hit1 = "rbxassetid://132949532914079",
+        Hit2 = "rbxassetid://138205601824020",
+        Hit3 = "rbxassetid://136468342928427",
+        Hit4 = "rbxassetid://116806174490590",
+        Hit5 = "rbxassetid://113121674784981",
     },
 }
 
