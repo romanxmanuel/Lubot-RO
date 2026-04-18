@@ -104,7 +104,6 @@ local function doHit1(player, state, character, target)
 
     local destination = CombatUtils.GetPositionBehindTarget(targetRoot, cfg.BlinkOffset or 2)
     CombatUtils.BlinkToPosition(root, destination, targetRoot.Position)
-    SFXService.PlayDash(root)
 
     fireImpact(player, cfg)
     doDamage(player, targetRoot.Position, 8, 1, target, cfg.Damage)
@@ -162,7 +161,6 @@ local function doHit4(player, state, character, target)
 
     local destination = CombatUtils.GetPositionBehindTarget(targetRoot, cfg.BlinkOffset or 2)
     CombatUtils.BlinkToPosition(root, destination, targetRoot.Position)
-    SFXService.PlayDash(root)
 
     fireImpact(player, cfg)
     doDamage(player, targetRoot.Position, 13, 4, target, cfg.Damage)
