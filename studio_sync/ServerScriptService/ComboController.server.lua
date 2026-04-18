@@ -238,6 +238,11 @@ comboInput.OnServerEvent:Connect(function(player)
     lastTargetName.Value = target.Name
     state.Step += 1
 
+    local unlockedHits = math.clamp(tonumber(player:GetAttribute("UnlockedComboHits")) or 5, 1, 5)
+    if state.Step > unlockedHits then
+        state.Step = 1
+    end
+
     if state.Step == 1 then
         doHit1(player, state, character, target)
     elseif state.Step == 2 then
