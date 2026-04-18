@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Combat = ReplicatedStorage:WaitForChild("Combat")
 local CombatConfig = require(Combat:WaitForChild("CombatConfig"))
+local MasterConfig = require(ReplicatedStorage:WaitForChild("MasterConfig"))
 local AssetRegistry = require(Combat:WaitForChild("AssetRegistry"))
 local CombatUtils = require(Combat:WaitForChild("CombatUtils"))
 local StunService = require(Combat:WaitForChild("StunService"))
@@ -73,7 +74,7 @@ local function resetCombo(state)
 end
 
 local function shouldRetainTarget(state)
-    local retain = CombatConfig.General.AutoLockRetainTime or 0
+    local retain = tonumber(MasterConfig.AutolockReleaseDelay) or CombatConfig.General.AutoLockRetainTime or 0
     return retain > 0 and (os.clock() - state.LastInputTime) <= retain
 end
 
@@ -214,11 +215,13 @@ comboInput.OnServerEvent:Connect(function(player)
         return
     end
 
-    if now - state.LastInputTime < (CombatConfig.General.InputDebounce or 0.08) then
+    local attackCooldown = tonumber(MasterConfig.AttackCooldown) or CombatConfig.General.InputDebounce or 0.08
+    if now - state.LastInputTime < attackCooldown then
         return
     end
 
-    if state.Step > 0 and (now - state.LastInputTime) > (CombatConfig.General.ComboResetWindow or 1.25) then
+    local chainWindow = tonumber(MasterConfig.AttackChainWindow) or CombatConfig.General.ComboResetWindow or 1.25
+    if state.Step > 0 and (now - state.LastInputTime) > chainWindow then
         resetCombo(state)
     end
 
