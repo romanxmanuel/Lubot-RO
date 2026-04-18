@@ -18,3 +18,13 @@ Third-party imported assets still spam runtime errors unrelated to this overhaul
 
 ## Important Note
 `ComboController.server.lua` currently includes temporary debug counters (`ComboInputEventCount`, `ComboBridgeFireCount`, `ComboLastTarget`) to verify event flow while stabilizing this pass.
+
+## VFX preservation fix (Apr 18, 2026)
+- VFXService now clones directly from Workspace/VFX Drops without mutating particle rates, anchoring, collisions, or scripts.
+- Hit mapping verified:
+  - Hit 1: Hakari Aura
+  - Hit 2: Meteor
+  - Hit 3: Meteor
+  - Hit 4: Hakari Aura
+  - Hit 5: Portal
+
