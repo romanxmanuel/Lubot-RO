@@ -1,0 +1,19 @@
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local comboInput = ReplicatedStorage:WaitForChild("CombatRemotes"):WaitForChild("ComboInput")
+
+local debounce = false
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed or debounce then
+        return
+    end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        debounce = true
+        comboInput:FireServer()
+        task.delay(0.06, function()
+            debounce = false
+        end)
+    end
+end)
