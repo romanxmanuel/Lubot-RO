@@ -85,7 +85,126 @@ local function hideDefaultCharacterVisuals(character, visualModel)
     end
 end
 
-local function attachVisualToRoot(character, visualModel)
+local function collectBodyParts(character)
+    local function gather(names)
+        local parts = {}
+        for _, name in ipairs(names) do
+            local p = character:FindFirstChild(name)
+            if p and p:IsA("BasePart") then
+                table.insert(parts, p)
+            end
+        end
+        return parts
+    end
+
+    local groups = {
+        head = gather({ "Head" }),
+        torso = gather({ "UpperTorso", "LowerTorso", "Torso" }),
+        leftArm = gather({ "LeftUpperArm", "LeftLowerArm", "LeftHand", "Left Arm" }),
+        rightArm = gather({ "RightUpperArm", "RightLowerArm", "RightHand", "Right Arm" }),
+        leftLeg = gather({ "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "Left Leg" }),
+        rightLeg = gather({ "RightUpperLeg", "RightLowerLeg", "RightFoot", "Right Leg" }),
+        root = gather({ "HumanoidRootPart" }),
+    }
+
+    groups.all = {}
+    for _, group in ipairs({ groups.head, groups.torso, groups.leftArm, groups.rightArm, groups.leftLeg, groups.rightLeg, groups.root }) do
+        for _, p in ipairs(group) do
+            table.insert(groups.all, p)
+        end
+    end
+
+    return groups
+end
+
+local function nearestPart(parts, worldPos)
+    local best = nil
+    local bestDist = math.huge
+    for _, p in ipairs(parts) do
+        local d = (p.Position - worldPos).Magnitude
+        if d < bestDist then
+            best = p
+            bestDist = d
+        end
+    end
+    return best
+end
+
+local function hasLeftHint(name)
+    return name:find("left", 1, true) ~= nil
+        or name:match("^l[_%-]") ~= nil
+        or name:match("[_%-%s]l[_%-%s]") ~= nil
+end
+
+local function hasRightHint(name)
+    return name:find("right", 1, true) ~= nil
+        or name:match("^r[_%-]") ~= nil
+        or name:match("[_%-%s]r[_%-%s]") ~= nil
+end
+
+local function pickAttachPart(meshPart, rig, state)
+    local n = string.lower(meshPart.Name)
+
+    if n:find("face") or n:find("head") then
+        return nearestPart(rig.head, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+    end
+
+    if n:find("arm") or n:find("hand") then
+        if hasLeftHint(n) then
+            return nearestPart(rig.leftArm, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+        end
+        if hasRightHint(n) then
+            return nearestPart(rig.rightArm, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+        end
+
+        local rootPart = rig.root[1]
+        if rootPart then
+            local localPos = rootPart.CFrame:PointToObjectSpace(meshPart.Position)
+            if math.abs(localPos.X) > 0.05 then
+                if localPos.X < 0 then
+                    state.leftArmNeutral += 1
+                    return nearestPart(rig.leftArm, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+                else
+                    state.rightArmNeutral += 1
+                    return nearestPart(rig.rightArm, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+                end
+            end
+        end
+
+        if state.leftArmNeutral <= state.rightArmNeutral then
+            state.leftArmNeutral += 1
+            return nearestPart(rig.leftArm, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+        else
+            state.rightArmNeutral += 1
+            return nearestPart(rig.rightArm, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+        end
+    end
+
+    if n:find("leg") or n:find("foot") or n:find("shoe") or n:find("thigh") or n:find("calf") then
+        if hasLeftHint(n) then
+            return nearestPart(rig.leftLeg, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+        end
+        if hasRightHint(n) then
+            return nearestPart(rig.rightLeg, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+        end
+
+        if state.leftLegNeutral <= state.rightLegNeutral then
+            state.leftLegNeutral += 1
+            return nearestPart(rig.leftLeg, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+        else
+            state.rightLegNeutral += 1
+            return nearestPart(rig.rightLeg, meshPart.Position) or nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+        end
+    end
+
+    if n:find("torso") or n:find("chest") or n:find("cloth") or n:find("body") or n:find("hood") or n:find("cape") or n:find("accessor") then
+        return nearestPart(rig.torso, meshPart.Position) or nearestPart(rig.head, meshPart.Position) or nearestPart(rig.all, meshPart.Position)
+    end
+
+    return nearestPart(rig.all, meshPart.Position)
+end
+
+local function attachVisualToRig(character, visualModel)
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then
         return
@@ -107,6 +226,14 @@ local function attachVisualToRoot(character, visualModel)
     rootWeld.Part1 = anchor
     rootWeld.Parent = anchor
 
+    local rig = collectBodyParts(character)
+    local state = {
+        leftArmNeutral = 0,
+        rightArmNeutral = 0,
+        leftLegNeutral = 0,
+        rightLegNeutral = 0,
+    }
+
     for _, d in ipairs(visualModel:GetDescendants()) do
         if d:IsA("BasePart") then
             d.Anchored = false
@@ -115,8 +242,9 @@ local function attachVisualToRoot(character, visualModel)
             d.CanTouch = false
             d.Massless = true
 
+            local attachTo = pickAttachPart(d, rig, state) or anchor
             local weld = Instance.new("WeldConstraint")
-            weld.Part0 = anchor
+            weld.Part0 = attachTo
             weld.Part1 = d
             weld.Parent = d
         end
@@ -145,13 +273,13 @@ local function applyAsin3Visual(character)
     scaleModelToTargetHeight(visual, TARGET_HEIGHT)
     visual:PivotTo(root.CFrame)
 
-    local _, size = visual:GetBoundingBox()
-    local pivot = visual:GetPivot()
+    local bboxCf, size = visual:GetBoundingBox()
     local desiredBottomY = root.Position.Y - (humanoid.HipHeight + (root.Size.Y * 0.5))
-    local currentBottomY = pivot.Position.Y - (size.Y * 0.5)
-    visual:PivotTo(pivot * CFrame.new(0, desiredBottomY - currentBottomY, 0))
+    local desiredCenter = Vector3.new(root.Position.X, desiredBottomY + (size.Y * 0.5), root.Position.Z)
+    local delta = desiredCenter - bboxCf.Position
+    visual:PivotTo(visual:GetPivot() + delta)
 
-    attachVisualToRoot(character, visual)
+    attachVisualToRig(character, visual)
     hideDefaultCharacterVisuals(character, visual)
 end
 
